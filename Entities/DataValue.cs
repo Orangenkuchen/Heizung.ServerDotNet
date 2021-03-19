@@ -1,0 +1,42 @@
+namespace Heizung.ServerDotNet.Entities
+{
+    using System;
+
+    /// <summary>
+    /// Beschreibung für einen DatenWert
+    /// </summary>
+    public class DataValue
+    {
+        #region Id
+        /// <summary>
+        /// Die Id vom Wert
+        /// </summary>
+        /// <value></value>
+        public int Id { get; set; }
+        #endregion
+
+        #region ValueType
+        /// <summary>
+        /// Die Id von dem DatenWert-Typ
+        /// </summary>
+        /// <value></value>
+        public int ValueType { get; set; }
+        #endregion
+
+        #region Value
+        /// <summary>
+        /// Der Wert
+        /// </summary>
+        /// <value></value>
+        public int Value { get; set; }
+        #endregion
+
+        #region TimeStamp
+        /// <summary>
+        /// Der Zeitpunkt zu dem der Wert aufgenommen wurde
+        /// </summary>
+        /// <value></value>
+        public DateTime TimeStamp { get; set; }
+        #endregion
+    }
+}

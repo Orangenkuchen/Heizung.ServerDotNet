@@ -18,7 +18,7 @@ namespace Heizung.ServerDotNet.Entities
         /// Die Beschreibung vom Fehler
         /// </summary>
         /// <value></value>
-        public int Description { get; set; }
+        public string Description { get; set; }
         #endregion
     }
 }

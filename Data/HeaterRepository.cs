@@ -1,15 +1,26 @@
-using MySqlConnector;
-using Dapper;
-using System.Collections.Generic;
-using Heizung.ServerDotNet.Entities;
-
 namespace Heizung.ServerDotNet.Data
 {
+    using MySqlConnector;
+    using Dapper;
+    using System.Collections.Generic;
+    using Heizung.ServerDotNet.Entities;
+    using System;
+    using System.Threading.Tasks;
+    using System.Linq;
+    using System.Text;
+
     /// <summary>
     /// DataRepository für Datenbankanfragen bezüglich der Heizung
     /// </summary>
     public class HeaterRepository
     {
+        #region static
+        /// <summary>
+        /// Formatstring, welche ein DateTime so umwandelt, dass es von der Datenbank erkannt wird
+        /// </summary>
+        private static string databaseDateTimeFormatString = "YYYY-MM-DD HH:mm:ss";
+        #endregion
+
         #region fields
         /// <summary>
         /// Die Verbindung zur Datenbank welche für die Zugriffe verwendet werden.
@@ -37,10 +48,11 @@ namespace Heizung.ServerDotNet.Data
         public IList<ValueDescription> GetAllValueDescriptions() 
         {
             IList<ValueDescription> result = new List<ValueDescription>();
-            this.mySqlConnection.Open();
             
             try
             {
+                this.mySqlConnection.Open();
+
                 var rows = this.mySqlConnection.Query("SELECT * FROM Heizung.ValueDescription;");
 
                 foreach(var row in rows)
@@ -71,10 +83,11 @@ namespace Heizung.ServerDotNet.Data
         public IList<ErrorDescription> GetAllErrorValues() 
         {
             IList<ErrorDescription> result = new List<ErrorDescription>();
-            this.mySqlConnection.Open();
             
             try
             {
+                this.mySqlConnection.Open();
+
                 var rows = this.mySqlConnection.Query("SELECT * FROM Heizung.ValueDescription;");
 
                 foreach(var row in rows)
@@ -93,387 +106,394 @@ namespace Heizung.ServerDotNet.Data
             return result;
         }
         #endregion
+
+        #region GetDataValues
+        /// <summary>
+        /// Ermittelt alle DatenWerte innherhalb der Zeit aus der Datenbank
+        /// </summary>
+        /// <param name="fromDate">Der Zeitpunkt, von dem an die Daten ermittelt werden sollen</param>
+        /// <param name="toDate">Der Zeitpunkt, bis zu dem die Daten ermittelt werden sollen</param>
+        /// <returns>Gibt die Daten zurück</returns>
+        public IList<DataValue> GetDataValues(DateTime fromDate, DateTime toDate) 
+        {
+            IList<DataValue> result = new List<DataValue>();
+            this.mySqlConnection.Open();
+            
+            try
+            {
+                var sql = $"SELECT * FROM Heizung.DataValues WHERE Timestamp BETWEEN @fromDate AND @toDate";
+
+                var rows = this.mySqlConnection.Query(sql, new { fromDate = fromDate, toDate = toDate });
+
+                foreach(var row in rows)
+                {
+                    result.Add(new DataValue() {
+                        Id = row.Id,
+                        TimeStamp = row.TimeStamp,
+                        Value = row.Value,
+                        ValueType = row.ValueTpye
+                    });
+                }
+            }
+            finally
+            {
+                this.mySqlConnection.Close();
+            }
+
+            return result;
+        }
+        #endregion
+
+        #region GetLatestDataValues
+        /// <summary>
+        /// Ermittelt die DatenWerte neusten Datenwerte (für jeden DatenTyp) aus der Datenbank
+        /// </summary>
+        /// <returns>Gibt die Daten zurück</returns>
+        public IDictionary<string, DataValue> GetLatestDataValues() 
+        {
+            IDictionary<string, DataValue> result = new Dictionary<string, DataValue>();
+            
+            try
+            {
+                this.mySqlConnection.Open();
+
+                var fromDate = DateTime.Now.AddHours(-2);
+
+                var sql = $"SELECT * FROM DataValues WHERE Timestamp > @fromDate;";
+
+                var rows = this.mySqlConnection.Query(sql, new { fromDate = fromDate });
+
+                foreach (var row in rows)
+                {
+                    var overrideValue = false;
+
+                    if (result.ContainsKey(row.ValueType.ToString()) == false)
+                    {
+                        overrideValue = true;
+                    }
+                    else if (result[row.ValueType.ToString()].TimeStamp < row.TimeStamp)
+                    {
+                        overrideValue = true;
+                    }
+
+                    if (overrideValue == true) 
+                    {
+                        result[row.ValueType.ToString()] = row;
+                    }
+                }
+            }
+            finally
+            {
+                this.mySqlConnection.Close();
+            }
+
+            return result;
+        }
+        #endregion
+
+        #region SetLoggingStateOfVaueType
+        /// <summary>
+        /// Erzeugt einen neuen Eintrag in der FehlerTabelle
+        /// </summary>
+        /// <param name="valueTypeList">errorText Der Fehlertext von der neuen Fehlermeldung</param>
+        public void SetLoggingStateOfVaueType(IList<KeyValuePair<int, bool>> valueTypeList)
+        {
+            try
+            {
+                this.mySqlConnection.Open();
+
+                using (var mySqlCommand = this.mySqlConnection.CreateCommand())
+                {
+                    var sqlStringBuilder = new StringBuilder(60);
+                    sqlStringBuilder.Append("UPDATE TABLE 'ValueDescription' (Id, IsLogged) VALUE ");
+
+                    var isFirst = true;
+
+                    for (var i = 0; i < valueTypeList.Count; i++)
+                    {
+                        var valueType = valueTypeList[i];
+
+                        if (isFirst == true)
+                        {
+                            isFirst = false;
+                        }
+                        else
+                        {
+                            sqlStringBuilder.Append(", ");
+                        }
+
+                        sqlStringBuilder.AppendFormat("(@id{0}, @value{0})", i);
+
+                        mySqlCommand.Parameters.AddWithValue("@id" + i, valueType.Key);
+                        mySqlCommand.Parameters.AddWithValue("@value" + i, valueType.Value);
+                    }
+
+                    mySqlCommand.CommandText = sqlStringBuilder.ToString();
+                    mySqlCommand.ExecuteNonQuery();
+                }
+            }
+            finally
+            {
+                this.mySqlConnection.Close();
+            }
+        }
+        #endregion
+
+        #region GetMailNotifierConfig
+        /// <summary>
+        /// Ermittelt die NotifierConfig aus der Datenbank
+        /// </summary>
+        /// <returns>Git die NotifierConfig zurück</returns>
+        public NotifierConfig GetMailNotifierConfig()
+        {
+            var result = new NotifierConfig()
+            {
+                MailConfigs = new List<MailConfig>()
+            };
+
+            var from = DateTime.Now.AddHours(-2);
+            IList<string> valuesStrings = new List<string>();
+
+            try
+            {
+                this.mySqlConnection.Open();
+
+                var lowerThresholdQueryTask = this.mySqlConnection.QueryAsync("SELECT LowerThreshold FROM NotifierConfig;");
+                var notifierMailsQueryTask = this.mySqlConnection.QueryAsync("SELECT Mail FROM NotifierMails;");
+
+                Task.WaitAll(lowerThresholdQueryTask, notifierMailsQueryTask);
+
+                IList<Exception> exceptions = new List<Exception>();
+
+                if (lowerThresholdQueryTask.IsFaulted)
+                {
+                    exceptions.Add(lowerThresholdQueryTask.Exception);
+                }
+
+                if (notifierMailsQueryTask.IsFaulted)
+                {
+                    exceptions.Add(notifierMailsQueryTask.Exception);
+                }
+
+                if (exceptions.Count > 0)
+                {
+                    throw new AggregateException("Beim ermitteln von der MailConfig ist mindestens ein Fehler aufgetreten", exceptions);
+                }
+
+                if (lowerThresholdQueryTask.Result.Count() > 0)
+                {
+                    result.LowerThreshold = lowerThresholdQueryTask.Result.ElementAt(0).LowerThreshold;
+
+                    foreach(var row in notifierMailsQueryTask.Result)
+                    {
+                        result.MailConfigs.Add(new MailConfig() 
+                        {
+                            Mail = row.Mail
+                        });
+                    }
+                }
+            }
+            finally
+            {
+                this.mySqlConnection.Close();
+            }
+
+            return result;
+        }
+        #endregion
+
+        #region SetMailNotifierConfig
+        /// <summary>
+        /// Ermittelt die NotifierConfig aus der Datenbank
+        /// </summary>
+        /// <param name="notifierConfig">Die Konfiguration, welche gespeichert werden soll</param>
+        /// <exception type="Exception">Wird geworfen, wenn ein Datenbankfehler auftritt</exception>
+        public void SetMailNotifierConfig(NotifierConfig notifierConfig)
+        {
+
+            List<string> valuesList = new List<string>();
+            for (var i = 0; i < notifierConfig.MailConfigs.Count; i++)
+            {
+                valuesList.Add($"({i}, '{notifierConfig.MailConfigs[i].Mail}')");
+            }
+
+            try
+            {
+                this.mySqlConnection.Open();
+
+                var updateNotifierConfigQueryTask = this.mySqlConnection.ExecuteAsync($"UPDATE NotifierConfig SET LowerThreshold = @lowerThreshhold", new { lowerThreshhold = notifierConfig.LowerThreshold });
+                
+                this.mySqlConnection.Execute("TRUNCATE TABLE NotifierMails");
+
+                using (var insertCommand = this.mySqlConnection.CreateCommand())
+                {
+                    var stringBuilder = new StringBuilder(60);
+                    stringBuilder.Append("INSERT INTO NotifierMails (Id, Mail) VALUES ");
+                    
+                    var isFirst = true;
+
+                    for (var i = 0; i < notifierConfig.MailConfigs.Count; i++)
+                    {
+                        var mailConfig = notifierConfig.MailConfigs[i];
+
+                        if (isFirst == true)
+                        {
+                            isFirst = false;
+                        }
+                        else
+                        {
+                            stringBuilder.Append(", ");
+                        }
+
+                        stringBuilder.AppendFormat("(@id{0}, @mail{0})", i);
+                        insertCommand.Parameters.AddWithValue("@id" + i, i);
+                        insertCommand.Parameters.AddWithValue("@mail" + i, mailConfig.Mail);
+                    }
+
+                    insertCommand.CommandText = stringBuilder.ToString();
+                    insertCommand.ExecuteNonQuery();
+                }
+
+                updateNotifierConfigQueryTask.Wait();
+
+                if (updateNotifierConfigQueryTask.IsFaulted)
+                {
+                    throw updateNotifierConfigQueryTask.Exception;
+                }
+            }
+            finally
+            {
+                this.mySqlConnection.Close();
+            }
+        }
+        #endregion
+
+        #region GetAllErrorHashtable
+        /// <summary>
+        /// Ermittelt eine Hashtable mit allen Fehlern
+        /// </summary>
+        /// <exception type="Exception">Wird geworfen, wenn ein Datenbankfehler auftritt</exception>
+        /// <returns>Gibt die Fehler als Dictionary zurück</returns>
+        public IDictionary<int, string> GetAllErrorHashtable()
+        {
+            IDictionary<int, string> result = new Dictionary<int, string>();
+
+            try
+            {
+                this.mySqlConnection.Open();
+
+                var rows = this.mySqlConnection.Query("SELECT * FROM Heizung.ErrorList");
+
+                foreach (var row in rows)
+                {
+                    if (result.ContainsKey(row.Id) == false)
+                    {
+                        result.Add(row.Id, row.Description);
+                    }
+                }
+            }
+            finally
+            {
+                this.mySqlConnection.Close();
+            }
+
+            return result;
+        }
+        #endregion
+
+        #region SetNewError
+        /// <summary>
+        /// Erzeugt einen neuen Eintrag in der FehlerTabelle
+        /// </summary>
+        /// <param name="errorText">Der Fehlertext von der neuen Fehlermeldung</param>
+        /// <exception type="Exception">Wird geworfen, wenn ein Datenbankfehler auftritt</exception>
+        /// <returns>Gibt die Id von dem neuen Eintrag zurück</returns>
+        public int SetNewError(string errorText)
+        {
+            var result = 0;
+
+            try
+            {
+                this.mySqlConnection.Open();
+
+                var transaction = this.mySqlConnection.BeginTransaction();
+
+                this.mySqlConnection.Execute($"INSERT INTO 'ErrorList' (Description) VALUE (@errorText)", param: new { errorText = errorText}, transaction: transaction);
+                result = this.mySqlConnection.QuerySingle<int>("Select LAST_INSERT_ID()", transaction);
+
+                transaction.Commit();
+            }
+            finally
+            {
+                this.mySqlConnection.Close();
+            }
+
+            return result;
+        }
+        #endregion
+
+        #region SetHeaterValue
+        /// <summary>
+        /// Fügt neue Heizwerte in die Tabelle hinzu
+        /// </summary>
+        /// <param name="heaterDataDictonary">Dictionary mit den Werten, welche hinzugefügt werden sollen</param>
+        /// <exception type="Exception">Wird geworfen, wenn ein Datenbankfehler auftritt</exception>
+        /// <returns>Gibt die Id von dem neuen Eintrag zurück</returns>
+        public void SetHeaterValue(IDictionary<int, HeaterData> heaterDataDictonary)
+        {
+            IList<string> insertValues = new List<string>();
+            var currentDate = DateTime.Now;
+
+            foreach (var heaterData in heaterDataDictonary)
+            {
+                foreach (var dataPoint in heaterData.Value.Data)
+                {
+                   insertValues.Add($"({heaterData.Value.ValueTypeId}, {dataPoint.Value}, {dataPoint.TimeStamp.ToString(databaseDateTimeFormatString)})");
+                }
+            }
+
+            try
+            {
+                this.mySqlConnection.Open();
+
+                using (var insertCommand = this.mySqlConnection.CreateCommand())
+                {
+                    var sqlStringBuilder = new StringBuilder(80);
+                    sqlStringBuilder.Append("INSERT INTO Heizung.DataValues (ValueType, Value, Timestamp) VALUES ");
+
+                    for (var i = 0; i < heaterDataDictonary.Count; i++)
+                    {
+                        var isFirst = true;
+
+                        for (var j = 0; j < heaterDataDictonary[i].Data.Count; j++)
+                        {
+                            if (isFirst == true)
+                            {
+                                isFirst = false;
+                            }
+                            else
+                            {
+                                sqlStringBuilder.Append(", ");
+                            }
+
+                            sqlStringBuilder.AppendFormat("@valueType{0}x{1}, @value{0}x{1}, @timestamp{0}x{1}", i, j);
+                            insertCommand.Parameters.AddWithValue($"@valueType{i}x{j}", heaterDataDictonary[i].ValueTypeId);
+                            insertCommand.Parameters.AddWithValue($"@value{i}x{j}", heaterDataDictonary[i].Data[j].Value);
+                            insertCommand.Parameters.AddWithValue($"@timestamp{i}x{j}", heaterDataDictonary[i].Data[j].TimeStamp);
+                        }
+                    }
+
+                    insertCommand.CommandText = sqlStringBuilder.ToString();
+                    insertCommand.ExecuteNonQuery();
+                }
+
+                this.mySqlConnection.Execute($"INSERT INTO Heizung.DataValues (ValueType, Value, Timestamp) VALUES {string.Join(", ", insertValues)}");
+            }
+            finally
+            {
+                this.mySqlConnection.Close();
+            }
+        }
+        #endregion
     }
 }
-
-    // #region GetDataValues
-    /**
-     * Ermittelt alle DatenWerte innherhalb der Zeit aus der Datenbank
-     * 
-     * @param fromDate Der Zeitpunkt, von dem an die Daten ermittelt werden sollen
-     * @param toDate Der Zeitpunkt, bis zu dem die Daten ermittelt werden sollen
-     * @returns Gibt ein Promise für die Daten zurück
-     */
-    public GetDataValues(fromDate: Date, toDate: Date): Promise<Array<DataValue>> {
-        let sql = `SELECT * FROM Heizung.DataValues WHERE Timestamp BETWEEN "${this.DateToDBDateString(fromDate)}" AND "${this.DateToDBDateString(toDate)}";`;
-
-        let result = new Promise<Array<DataValue>>((resolve, reject) => {
-            let connectionPromise = this.connectionPool.getConnection();
-
-            connectionPromise.then((connection) => {
-                let queryResultPromise = connection.query(sql);
-                queryResultPromise.then((rows: Array<DataValue>) => {
-                    connection.release();
-
-                    resolve(rows);
-                });
-
-                queryResultPromise.catch((exception) => {
-                    try { 
-                        connection.release()
-                    } finally { 
-                        reject(exception);
-                    }
-                });
-            });
-            connectionPromise.catch((exception) => reject(exception));
-        });
-
-        return result;
-    }
-    // #endregion
-
-    // #region GetLatestDataValues
-    /**
-     * Ermittelt die DatenWerte neusten Datenwerte (für jeden DatenTyp) aus der Datenbank
-     * 
-     * @returns Gibt ein Promise für die Daten zurück
-     */
-    public GetLatestDataValues(): Promise<DataValueHashTable> {
-        let from = new Date();
-        from.setHours(from.getHours() - 2);
-        let sql = `SELECT * FROM DataValues WHERE Timestamp > "${this.DateToDBDateString(from)}";`;
-
-        let result = new Promise<DataValueHashTable>((resolve, reject) => {
-            let connectionPromise = this.connectionPool.getConnection();
-
-            connectionPromise.then((connection) => {
-                let queryResultPromise = connection.query(sql);
-                queryResultPromise.then((rows: Array<DataValue>) => {
-                    connection.release();
-
-                    let resultRows: DataValueHashTable = {};
-
-                    rows.forEach((row) => {
-                        let override = false;
-
-                        if (typeof resultRows[row.ValueType.toString()] == "undefined") {
-                            override = true;
-                        } else if (resultRows[row.ValueType.toString()].TimeStamp < row.TimeStamp) {
-                            override = true;
-                        }
-
-                        if (override == true) {
-                            resultRows[row.ValueType.toString()] = row;
-                        }
-                    });
-
-                    resolve(resultRows);
-                });
-
-                queryResultPromise.catch((exception) => {
-                    try { 
-                        connection.release()
-                    } finally { 
-                        reject(exception);
-                    }
-                });
-            });
-            connectionPromise.catch((exception) => reject(exception));
-        });
-
-        return result;
-    }
-    // #endregion
-
-    // #region SetLoggingStateOfVaueType
-    /**
-     * Erzeugt einen neuen Eintrag in der FehlerTabelle
-     * 
-     * @param errorText Der Fehlertext von der neuen Fehlermeldung
-     * @returns Gibt ein Promise mit der Id zurück
-     */
-    public SetLoggingStateOfVaueType(valueTypeArray: Array<{key: Number, state: Boolean}>): Promise<void> {
-        let that = this;
-
-        let valuesSqlStringArray = new Array<string>();
-
-        valueTypeArray.forEach((valueType) => {
-            valuesSqlStringArray.push(`${valueType.key}, ${valueType.state == true ? 1 : 0 }`);
-        });
-
-        let result: Promise<void> = new Promise<void>(function(resolve, reject) {
-            let connectionPromise = that.connectionPool.getConnection();
-
-            connectionPromise.then(connection => {
-                let sql = `UPDATE TABLE 'ValueDescription' (Id, IsLogged) VALUE ${valuesSqlStringArray.join(", ")} ON DUPLICATE KEY UPDATE IsLogged=VALUES(IsLogged);`;
-                let queryResultPromise = connection.query(sql);
-
-                queryResultPromise.then(result => {
-                    connection.release();
-                    resolve();
-                });
-                
-                queryResultPromise.catch((exception) => {
-                    try { 
-                        connection.release()
-                    } finally { 
-                        reject(exception);
-                    }
-                });
-            });
-
-            connectionPromise.catch(exception => reject(exception));
-        });
-        
-        return result;
-    }
-    // #endregion
-
-    // #region GetMailNotifierConfig
-    /**
-     * Ermittelt die NotifierConfig aus der Datenbank
-     */
-    public GetGetMailNotifierConfig(): Promise<NotifierConfig> {
-        let that = this;
-        let notifierConfig: NotifierConfig = { lowerThreshold: 0, mailConfigs: new Array<MailConfig>() };
-
-        let result: Promise<NotifierConfig> = new Promise<NotifierConfig>((resolve, reject) => {
-            let connectionPromise = that.connectionPool.getConnection();
-            
-            connectionPromise.then(connection => {
-                let notifierConfigLowerThreshholdPromise = new Promise<number>((resolveNotifierConfig, rejectNotifierConfig) => {
-                    let lowerThreshholdQuerryPromise = connection.query("SELECT LowerThreshold FROM NotifierConfig;");
-
-                    lowerThreshholdQuerryPromise.then(rows => {
-                        if (rows.length > 0) {
-                            resolveNotifierConfig(rows[0].LowerThreshold);
-                        }
-                    });
-
-                    lowerThreshholdQuerryPromise.catch(exception => rejectNotifierConfig());
-                });
-
-                let notifierMailListPromise = new Promise<Array<MailConfig>>((resolveNotifierMailList, rejectNotifierMailList) => {
-                    let notifierMailListQuerryPromise = connection.query("SELECT Mail FROM NotifierMails;");
-
-                    notifierMailListQuerryPromise.then(rows => {
-                        let mailConfigs = new Array<MailConfig>();
-
-                        rows.forEach((row) => {
-                            mailConfigs.push(row);
-                        });
-
-                        resolveNotifierMailList(mailConfigs);
-                    });
-
-                    notifierMailListQuerryPromise.catch(exception => rejectNotifierMailList());
-                });
-
-                let notifierAllPromise = Promise.all([notifierConfigLowerThreshholdPromise, notifierMailListPromise]);
-
-                notifierAllPromise.then((resultArray) => {
-                    connection.release();
-
-                    let [ notifierConfigLowerThreshhold, notifierMailList ] = resultArray;
-
-                    resolve({
-                        lowerThreshold: notifierConfigLowerThreshhold,
-                        mailConfigs: notifierMailList
-                    });
-                });
-
-                notifierAllPromise.catch((exception) => {
-                    try { 
-                        connection.release()
-                    } finally { 
-                        reject(exception);
-                    }
-                });
-            });
-
-            connectionPromise.catch(exception => reject());
-        });
-
-        return result;
-    }
-    // #endregion
-
-    // #region SetMailNotifierConfig
-    /**
-     * Ermittelt die NotifierConfig aus der Datenbank
-     */
-    public SetMailNotifierConfig(notifierConfig: NotifierConfig): Promise<void> {
-        let that = this;
-
-        let valuesArray = [];
-        for(var i = 0; i < notifierConfig.mailConfigs.length; i++) {
-            valuesArray.push(`(${i}, '${notifierConfig.mailConfigs[i].Mail}')`);
-        }
-
-        let sqlQuerries = [];
-        
-        sqlQuerries.push("TRUNCATE TABLE NotifierMails");
-        sqlQuerries.push(`INSERT INTO NotifierMails (Id, Mail) VALUES ${valuesArray.join(", ")}`);
-        sqlQuerries.push(`UPDATE NotifierConfig SET LowerThreshold = ${notifierConfig.lowerThreshold}`);
-
-        let result: Promise<void> = new Promise<void>((resolve, reject) => {
-            that.connectionPool.getConnection()
-                               .then(connection => {
-                                    var querryPormiseArray = new Array<Promise<any>>();
-                                    
-                                    sqlQuerries.forEach((sql) => {
-                                        querryPormiseArray.push(connection.query(sql));
-                                    });
-
-                                    Promise.all(querryPormiseArray).then((results) => {
-                                        connection.release();
-                                        resolve();
-                                    }).catch(exception => {
-                                        try {
-                                            connection.release();
-                                        } finally {
-                                            reject();
-                                        }
-                                    });
-                               });
-        });
-
-        return result;
-    }
-    // #endregion
-
-    // #region DateToDBDateString
-    /**
-     * Wandelt ein Date in einen String um, welcher in SQL-Querrys verwendet werden kann
-     * 
-     * @param date Das Datum welches umgewandelt werden soll
-     * @return Das Datum als DB-Query-String
-     */
-    private DateToDBDateString(date: Date): string {
-        return `${date.getFullYear()}-${this.leftPad2(date.getMonth() + 1)}-${this.leftPad2(date.getDate())} ${this.leftPad2(date.getHours())}:${this.leftPad2(date.getMinutes())}:${this.leftPad2(date.getSeconds())}`;
-    }
-    // #endregion
-
-    // #region GetAllErrorHashtable
-    /**
-     * Ermittelt eine Hashtable mit allen Fehlern.
-     * 
-     * @returns Gibt ein Promise mit der ErrorHashtable
-     */
-    public GetAllErrorHashtable(): Promise<ErrorHashTable> {
-        let that = this;
-
-        let result: Promise<ErrorHashTable> = new Promise<ErrorHashTable>(function(resolve, reject) {
-            that.connectionPool.getConnection()
-                                .then(connection => {
-                                    connection.query(`SELECT * FROM Heizung.ErrorList`)
-                                                .then(rows => {
-                                                    connection.release();
-                                                    let errorHashTable: ErrorHashTable = {};
-
-                                                    rows.forEach((row) => {
-                                                        errorHashTable[row.Id] = row.Description;
-                                                    });
-                                                    
-                                                    resolve(errorHashTable);
-                                                })
-                                                .catch(exception => {
-                                                    try {
-                                                        connection.release();
-                                                    } finally {
-                                                        reject(exception);
-                                                    }
-                                                });
-                                })
-                                .catch(exception => reject(exception));
-        });
-        
-        return result;
-    }
-    // #endregion
-
-    // #region SetNewError
-    /**
-     * Erzeugt einen neuen Eintrag in der FehlerTabelle
-     * 
-     * @param errorText Der Fehlertext von der neuen Fehlermeldung
-     * @returns Gibt ein Promise mit der Id zurück
-     */
-    public SetNewError(errorText: string): Promise<number> {
-        let that = this;
-
-        let result: Promise<number> = new Promise<number>(function(resolve, reject) {
-            that.connectionPool.getConnection()
-                            .then(connection => {
-                                connection.query(`INSERT INTO 'ErrorList' (Description) VALUE ('${errorText}')`)
-                                            .then(result => {
-                                                connection.release();
-                                                resolve(result.insertId);
-                                            })
-                                            .catch(exception => {
-                                                try {
-                                                    connection.release();
-                                                } finally {
-                                                    reject(exception);
-                                                }
-                                            });
-                            })
-                            .catch(exception => reject(exception));
-        });
-        
-        return result;
-    }
-    // #endregion
-
-    // #region SetHeaterValue
-    /**
-     * Fügt neue Heizwerte in die Tabelle hinzu
-     * 
-     * @param heaterDataHashMap Hashmap mit den Werten, welche hinzugefügt werden sollen
-     * @returns Gibt ein Promise das angibt wenn der Insert abgeschlossen wurde
-     */
-    public SetHeaterValue(heaterDataHashMap: HeaterDataHashMap): Promise<Boolean> {
-        let that = this;
-        let sqlInsertValues = new Array<string>();
-        let currentTime = new Date();
-        let currentTimeString = `${currentTime.getFullYear()}-${this.leftPad2(currentTime.getMonth() + 1)}-${this.leftPad2(currentTime.getDate())} ${this.leftPad2(currentTime.getHours())}:${this.leftPad2(currentTime.getMinutes())}:${this.leftPad2(currentTime.getSeconds())}`;
-
-        for(let valueTypeId in heaterDataHashMap) {
-            let heaterValue = heaterDataHashMap[valueTypeId];
-
-            heaterValue.data.forEach(dataPoint => {
-                if (typeof dataPoint.value == "number") {
-                    sqlInsertValues.push(`(${heaterValue.valueTypeId}, ${dataPoint.value}, '${currentTimeString}')`);
-                } else {
-                    sqlInsertValues.push(`(${heaterValue.valueTypeId}, '${dataPoint.value}', '${currentTimeString}')`);
-                }
-            });
-        }
-
-        let sql = `INSERT INTO Heizung.DataValues (ValueType, Value, Timestamp) VALUES ${sqlInsertValues.join(", ")}`;
-
-        let result: Promise<Boolean> = new Promise<Boolean>(function(resolve, reject) {
-            that.connectionPool.getConnection()
-                            .then(connection => {
-                                connection.query(sql)
-                                            .then(result => {
-                                                connection.release();
-                                                resolve(true);
-                                            })
-                                            .catch(exception => {
-                                                try {
-                                                    connection.release();
-                                                } finally {
-                                                    reject(exception);
-                                                }
-                                            });
-                            })
-                            .catch(exception => reject(exception))
-        });
-        
-        return result;
-    }
-    // #endregion
-
-    // #region leftPad2

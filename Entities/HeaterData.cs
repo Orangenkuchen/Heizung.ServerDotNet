@@ -1,7 +1,7 @@
-using System.Collections.Generic;
-
 namespace Heizung.ServerDotNet.Entities
 {
+    using System.Collections.Generic;
+
     /// <summary>
     /// Klasse für einen Datenpunkt welcher an den Client geschickt wird.
     /// </summary>
@@ -44,7 +44,7 @@ namespace Heizung.ServerDotNet.Entities
         /// Die Daten für den Heizwert
         /// </summary>
         /// <value></value>
-        public IList<KeyValuePair<System.DateTime, double>> Data { get; set; }
+        public IList<HeaterDataPoint> Data { get; set; }
         #endregion
     }
 }
