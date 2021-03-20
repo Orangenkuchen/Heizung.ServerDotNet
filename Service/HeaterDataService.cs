@@ -12,13 +12,13 @@ namespace Heizung.ServerDotNet.Service
     /// <summary>
     /// Servcie für die Heizungsdaten
     /// </summary>
-    public class HeaterDataService : IDisposable
+    public class HeaterDataService : IDisposable, IHeaterDataService
     {
         #region fields
         /// <summary>
         /// Repository für die Heizungsdaten
         /// </summary>
-        private readonly HeaterRepository heaterRepository;
+        private readonly IHeaterRepository heaterRepository;
 
         /// <summary>
         /// Liste von Funktionen, welche beim abbauen der Klasse aufgerufen werden sollen
@@ -72,7 +72,7 @@ namespace Heizung.ServerDotNet.Service
         /// </summary>
         /// <param name="logger">Service für Lognachrichten</param>
         /// <param name="heaterRepository">Repository für die Heizungsdaten</param>
-        public HeaterDataService(ILogger logger, HeaterRepository heaterRepository)
+        public HeaterDataService(ILogger<HeaterDataService> logger, IHeaterRepository heaterRepository)
         {
             this.logger = logger;
             this.heaterRepository = heaterRepository;
@@ -95,8 +95,13 @@ namespace Heizung.ServerDotNet.Service
 
             var saveTimer = new Timer(
                 (timerState) => {
+                    this.logger.LogDebug("HistoryDataTimer elapsed. Saving Historydata.");
                     this.updateSinceDBSave = false;
-                    this.heaterRepository.SetHeaterValue(this.CurrentHeaterValues);
+
+                    if (this.CurrentHeaterValues.Count > 0)
+                    {
+                        this.heaterRepository.SetHeaterValue(this.CurrentHeaterValues);
+                    }
                 }, 
                 null, 
                 0, 
@@ -108,12 +113,7 @@ namespace Heizung.ServerDotNet.Service
             });
 
             this.errorDictionaryPromise = Task.Run(() => {
-                IDictionary<int, ErrorDescription> result = new Dictionary<int, ErrorDescription>();
-
-                foreach (var errorDescription in this.heaterRepository.GetAllErrorValues())
-                {
-                    result[errorDescription.Id] = errorDescription;
-                }
+                IDictionary<int, ErrorDescription> result = this.heaterRepository.GetAllErrorDictionary();
 
                 return result;
             });
@@ -143,7 +143,7 @@ namespace Heizung.ServerDotNet.Service
         /// </summary>
         /// <param name="heaterValues">Die neuen Daten</param>
         public async void SetNewData(IList<HeaterValue> heaterValues) {
-            this.logger.LogTrace("SetNewData");
+            this.logger.LogTrace("SetNewData started");
             this.updateSinceDBSave = true;
 
             await Task.WhenAll(this.heaterValueDescriptionDictionaryPromise, this.errorDictionaryPromise);
@@ -232,6 +232,8 @@ namespace Heizung.ServerDotNet.Service
                     this.NewDataEvent.Invoke(this.CurrentHeaterValues);
                 }
             }
+
+            this.logger.LogTrace("SetNewData ended");
         }
         #endregion
 

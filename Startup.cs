@@ -1,34 +1,31 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Reflection;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.HttpsPolicy;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Microsoft.OpenApi.Models;
-
 namespace Heizung.ServerDotNet
 {
+    using System;
+    using System.Collections.Generic;
+    using System.IO;
+    using System.Linq;
+    using System.Net;
+    using System.Reflection;
+    using System.Threading.Tasks;
+    using Heizung.ServerDotNet.Data;
+    using Heizung.ServerDotNet.Mail;
+    using Heizung.ServerDotNet.Service;
+    using Microsoft.AspNetCore.Builder;
+    using Microsoft.AspNetCore.Hosting;
+    using Microsoft.AspNetCore.HttpsPolicy;
+    using Microsoft.AspNetCore.Mvc;
+    using Microsoft.Extensions.Configuration;
+    using Microsoft.Extensions.DependencyInjection;
+    using Microsoft.Extensions.Hosting;
+    using Microsoft.Extensions.Logging;
+    using Microsoft.OpenApi.Models;
+    using MySqlConnector;
+
     /// <summary>
     /// Diese Klasse wird beim Starten des Webservers aufgerufen und konfiguriert diesen
     /// </summary>
     public class Startup
     {
-        #region fields
-        /// <summary>
-        /// Die Konfiguration, welche der Webserver verwendet
-        /// </summary>
-        /// <value>Wird beim Erstellen der Klasse gesetzt</value>
-        public IConfiguration Configuration { get; }
-        #endregion
-
         #region ctor
         /// <summary>
         /// Initialisiert die Klasse und setzt die Konfiguration
@@ -36,8 +33,16 @@ namespace Heizung.ServerDotNet
         /// <param name="configuration">Die Konfiguration welche verwendet werden soll</param>
         public Startup(IConfiguration configuration)
         {
-            Configuration = configuration;
+            this.Configuration = configuration;
         }
+        #endregion
+        
+        #region Configuration
+        /// <summary>
+        /// Die Konfiguration, welche der Webserver verwendet
+        /// </summary>
+        /// <value>Wird beim Erstellen der Klasse gesetzt</value>
+        public IConfiguration Configuration { get; }
         #endregion
 
         #region ConfigureServices
@@ -49,7 +54,17 @@ namespace Heizung.ServerDotNet
         {
             Serilog.Log.Debug("Konfiguriere die Services vom Webserver");
 
-            //services.AddSingleton;
+            var mailConfig = new MailConfiguration()
+            {
+                SmtpServer = this.Configuration["MailConfig:WarningMail:SmtpHostServer"],
+                SmtpServerPort = this.Configuration.GetValue<uint>("MailConfig:WarningMail:SmtpHostPort"),
+                SmtpServerCredential = new NetworkCredential(this.Configuration["MailConfig:WarningMail:UserName"], this.Configuration["MailConfig:WarningMail:UserPassword"])
+            };
+
+            services.AddSingleton<MailConfiguration>(mailConfig);
+
+            services.AddSingleton<IHeaterRepository>(new HeaterRepository(this.Configuration.GetConnectionString("HeaterDatabase")));
+            services.AddSingleton<IHeaterDataService, HeaterDataService>();
 
             services.AddControllers();
             services.AddSwaggerGen(c =>

@@ -33,6 +33,9 @@ namespace Heizung.ServerDotNet
                 .WriteTo.File(logfilePath)
                 .CreateLogger();
 
+            AppDomain currentDomain = AppDomain.CurrentDomain;
+            currentDomain.UnhandledException += new UnhandledExceptionEventHandler(HandleUnhandledException);
+
             try
             {
                 Log.Information("Starte den WebServer");
@@ -64,6 +67,20 @@ namespace Heizung.ServerDotNet
                     webBuilder.UseStartup<Startup>();
                 }
             );
+        }
+        #endregion
+
+        #region HandleUnhandledException
+        /// <summary>
+        /// Wird aufgerufen, wenn eine Exception im Programm nicht abgefangen wird
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="args"></param>
+        private static void HandleUnhandledException(object sender, UnhandledExceptionEventArgs args)
+        {
+            Exception exception = (Exception) args.ExceptionObject;
+
+            Log.Error(exception, "Unhandled exception accourced");
         }
         #endregion
     }

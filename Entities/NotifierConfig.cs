@@ -12,7 +12,7 @@ namespace Heizung.ServerDotNet.Entities
         /// Die Untergrenze vom Puffer ab wann die Mailbenarichtigungen gesendet werden
         /// </summary>
         /// <value></value>
-        public int LowerThreshold { get; set; }
+        public double LowerThreshold { get; set; }
         #endregion
 
         #region MailConfigs

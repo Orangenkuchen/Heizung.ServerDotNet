@@ -25,10 +25,10 @@ namespace Heizung.ServerDotNet.Entities
 
         #region Value
         /// <summary>
-        /// Der Wert
+        /// Der Wert (kann String oder int sein)
         /// </summary>
         /// <value></value>
-        public int Value { get; set; }
+        public object Value { get; set; }
         #endregion
 
         #region TimeStamp

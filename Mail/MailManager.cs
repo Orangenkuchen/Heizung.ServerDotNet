@@ -7,6 +7,7 @@ namespace Heizung.ServerDotNet.Mail
     using System.Net.Mail;
     using System.Text;
     using Heizung.ServerDotNet.Data;
+    using Microsoft.Extensions.Logging;
 
     /// <summary>
     /// Klasse zum Versenden der Mails der Heizung
@@ -28,25 +29,30 @@ namespace Heizung.ServerDotNet.Mail
         /// Heizungsrepository aus dem die Daten für geholt werden, welche in den Emails verwendet werden
         /// </summary>
         private readonly HeaterRepository heaterRepository;
+
+        /// <summary>
+        /// Servcie zum Loggen
+        /// </summary>
+        private readonly ILogger logger;
         #endregion
 
         #region ctor
         /// <summary>
         /// Initilisiert die Klasse, damit Email versendet werden können
         /// </summary>
-        /// <param name="smtpServer">Die Serveradresse von der Mail, welche verwendet werden soll</param>
-        /// <param name="smtpServerPort">Der Serverport von der Mail, welche verwendet werden soll</param>
-        /// <param name="smtpServerCredential">Die Zugangsdaten vom Mailkonto</param>
+        /// <param name="logger">Servcie zum Loggen</param>
+        /// <param name="mailConfiguration">Die Configuration für das Mail-Konto</param>
         /// <param name="heaterRepository">Heizungsrepository aus dem die Daten für geholt werden, welche in den Emails verwendet werden</param>
-        public MailManager(string smtpServer, int smtpServerPort, NetworkCredential smtpServerCredential, HeaterRepository heaterRepository)
+        public MailManager(ILogger logger, MailConfiguration mailConfiguration, HeaterRepository heaterRepository)
         {
-            this.smtpClient = new SmtpClient(smtpServer)
+            this.logger = logger;
+            this.smtpClient = new SmtpClient(mailConfiguration.SmtpServer)
             {
-                Port = smtpServerPort,
-                Credentials = smtpServerCredential,
+                Port = Convert.ToInt32(mailConfiguration.SmtpServerPort),
+                Credentials = mailConfiguration.SmtpServerCredential,
                 EnableSsl = true
             };
-            this.networkCredential = smtpServerCredential;
+            this.networkCredential = mailConfiguration.SmtpServerCredential;
 
             this.heaterRepository = heaterRepository;
         }
@@ -59,6 +65,8 @@ namespace Heizung.ServerDotNet.Mail
         /// </summary>
         public void SendMailWhenCheckFails()
         {
+            this.logger.LogTrace("SendMailWhenCheckFails started");
+
             var latestDataValuesDictionary = this.heaterRepository.GetLatestDataValues();
             var mailNotifierConfig = this.heaterRepository.GetMailNotifierConfig();
 
@@ -69,41 +77,49 @@ namespace Heizung.ServerDotNet.Mail
                 mailStrings.Add(mailConfig.Mail);
             }
 
-            if (mailStrings.Count == 0) {
+            if (latestDataValuesDictionary.Count == 0) {
+                this.logger.LogTrace($"No Data since 2h. Sending warning Email to \"{string.Join(";", mailStrings)}\".");
                 this.SendMissingValuesWaringMail(mailStrings.ToArray());
+                this.logger.LogTrace("Warning mail (mission data) was send.");
             } else {
                 if (latestDataValuesDictionary.ContainsKey("99"))
                 {
-                    if (latestDataValuesDictionary["99"].Value != 0)
+                    if ((int)latestDataValuesDictionary["99"].Value != 0)
                     {
-                        this.SendErrorMail(latestDataValuesDictionary["99"].Value, mailStrings.ToArray());
+                        this.logger.LogTrace($"Error received from heater. Sending warning Email to \"{string.Join(";", mailStrings)}\".");
+                        this.SendErrorMail((int)latestDataValuesDictionary["99"].Value, mailStrings.ToArray());
+                        this.logger.LogTrace("Error mail was send.");
                     }
                 }
 
-                var upperBufferTemperature = 0;
-                var lowerBufferTemperature = 0;
-                var heatingStatus = 0;
+                var upperBufferTemperature = 0d;
+                var lowerBufferTemperature = 0d;
+                var heatingStatus = 0d;
 
                 if (latestDataValuesDictionary.ContainsKey("20"))
                 {
-                    upperBufferTemperature = latestDataValuesDictionary["20"].Value;
+                    upperBufferTemperature = (double)latestDataValuesDictionary["20"].Value;
                 }
                 if (latestDataValuesDictionary.ContainsKey("21"))
                 {
-                    lowerBufferTemperature = latestDataValuesDictionary["21"].Value;
+                    lowerBufferTemperature = (double)latestDataValuesDictionary["21"].Value;
                 }
                 if (latestDataValuesDictionary.ContainsKey("1"))
                 {
-                    heatingStatus = latestDataValuesDictionary["1"].Value;
+                    heatingStatus = (int)latestDataValuesDictionary["1"].Value;
                 }
 
                 // Wenn die Temperatur unterhalb der Grenze ist und in der Heizung das Feuer aus ist
                 if (upperBufferTemperature < mailNotifierConfig.LowerThreshold &&
                     heatingStatus == 5)
                 {
+                    this.logger.LogTrace($"Temperature below threshhold was detected. Sending warning Email to \"{string.Join(";", mailStrings)}\".");
                     this.SendTemperatureLowMail(lowerBufferTemperature, upperBufferTemperature, mailNotifierConfig.LowerThreshold, mailStrings.ToArray());
+                    this.logger.LogTrace("Temperature warning mail was sent");
                 }
             }
+
+            this.logger.LogTrace("SendMailWhenCheckFails stopped");
         }
         #endregion
 
@@ -195,20 +211,3 @@ namespace Heizung.ServerDotNet.Mail
         #endregion
     }
 }
-
-
-    /*public constructor(mail: string, password: string, connectionPool: Pool) {
-        this.mail = mail;
-        this.mailTransporter = nodemailer.createTransport({
-            'host': 'smtp.gmail.com',
-            'port': 587,
-            'secure': false,
-            'requireTLS': true,
-            'auth': {
-                'user': mail,
-                'pass': password
-            }
-        });
-
-        this.heizungsRepository = new HeizungRepository(connectionPool);
-    }*/

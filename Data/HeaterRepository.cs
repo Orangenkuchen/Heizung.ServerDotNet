@@ -12,7 +12,7 @@ namespace Heizung.ServerDotNet.Data
     /// <summary>
     /// DataRepository für Datenbankanfragen bezüglich der Heizung
     /// </summary>
-    public class HeaterRepository
+    public class HeaterRepository : IHeaterRepository
     {
         #region static
         /// <summary>
@@ -23,19 +23,19 @@ namespace Heizung.ServerDotNet.Data
 
         #region fields
         /// <summary>
-        /// Die Verbindung zur Datenbank welche für die Zugriffe verwendet werden.
+        /// Der Verbindungsstring zur Datenbank
         /// </summary>
-        private readonly MySqlConnection mySqlConnection;
+        private readonly string connectionString;
         #endregion
 
         #region ctor
         /// <summary>
         /// Initialisiert die Klasse und fügt die Datenbankverbindung hinzu
         /// </summary>
-        /// <param name="mySqlConnection">Die Datenbank auf die Zugegriffen werden soll</param>
-        public HeaterRepository(MySqlConnection mySqlConnection)
+        /// <param name="connectionString">Der Verbindungsstring zur Datenbank</param>
+        public HeaterRepository(string connectionString)
         {
-            this.mySqlConnection = mySqlConnection;
+            this.connectionString = connectionString;
         }
         #endregion
 
@@ -49,58 +49,28 @@ namespace Heizung.ServerDotNet.Data
         {
             IList<ValueDescription> result = new List<ValueDescription>();
             
-            try
+            using (var connection = new MySqlConnection(this.connectionString))
             {
-                this.mySqlConnection.Open();
-
-                var rows = this.mySqlConnection.Query("SELECT * FROM Heizung.ValueDescription;");
-
-                foreach(var row in rows)
+                try
                 {
-                    result.Add(new ValueDescription() {
-                        Id = row.Id,
-                        Description = row.Description,
-                        Unit = row.Unit,
-                        IsLogged = row.IsLogged[0]
-                    });
+                    connection.Open();
+
+                    var rows = connection.Query("SELECT * FROM Heizung.ValueDescription;");
+
+                    foreach(var row in rows)
+                    {
+                        result.Add(new ValueDescription() {
+                            Id = row.Id,
+                            Description = row.Description,
+                            Unit = row.Unit,
+                            IsLogged = Convert.ToBoolean(row.IsLogged)
+                        });
+                    }
                 }
-            }
-            finally
-            {
-                this.mySqlConnection.Close();
-            }
-
-            return result;
-        }
-        #endregion
-
-        #region GetAllErrorValues
-        /// <summary>
-        /// Ermittelt alle Fehlerwerte aus der Datenbank
-        /// </summary>
-        /// <returns>Gibt ein Promise für die Fehlerwerte zurück</returns>
-        /// <exception type="exception">Wird geworfen, wenn keine Verbindung mit der Datenbank hergestellt werden kann</exception>
-        public IList<ErrorDescription> GetAllErrorValues() 
-        {
-            IList<ErrorDescription> result = new List<ErrorDescription>();
-            
-            try
-            {
-                this.mySqlConnection.Open();
-
-                var rows = this.mySqlConnection.Query("SELECT * FROM Heizung.ValueDescription;");
-
-                foreach(var row in rows)
+                finally
                 {
-                    result.Add(new ErrorDescription() {
-                        Id = row.Id,
-                        Description = row.Description
-                    });
+                    connection.Close();
                 }
-            }
-            finally
-            {
-                this.mySqlConnection.Close();
             }
 
             return result;
@@ -117,27 +87,31 @@ namespace Heizung.ServerDotNet.Data
         public IList<DataValue> GetDataValues(DateTime fromDate, DateTime toDate) 
         {
             IList<DataValue> result = new List<DataValue>();
-            this.mySqlConnection.Open();
-            
-            try
+
+            using (var connection = new MySqlConnection(this.connectionString))
             {
-                var sql = $"SELECT * FROM Heizung.DataValues WHERE Timestamp BETWEEN @fromDate AND @toDate";
+                connection.Open();
 
-                var rows = this.mySqlConnection.Query(sql, new { fromDate = fromDate, toDate = toDate });
-
-                foreach(var row in rows)
+                try
                 {
-                    result.Add(new DataValue() {
-                        Id = row.Id,
-                        TimeStamp = row.TimeStamp,
-                        Value = row.Value,
-                        ValueType = row.ValueTpye
-                    });
+                    var sql = $"SELECT * FROM Heizung.DataValues WHERE Timestamp BETWEEN @FromDate AND @ToDate";
+
+                    var rows = connection.Query(sql, new { FromDate = fromDate, ToDate = toDate });
+
+                    foreach(var row in rows)
+                    {
+                        result.Add(new DataValue() {
+                            Id = (int)row.Id,
+                            TimeStamp = row.Timestamp,
+                            Value = row.Value,
+                            ValueType = row.ValueType
+                        });
+                    }
                 }
-            }
-            finally
-            {
-                this.mySqlConnection.Close();
+                finally
+                {
+                    connection.Close();
+                }
             }
 
             return result;
@@ -152,39 +126,42 @@ namespace Heizung.ServerDotNet.Data
         public IDictionary<string, DataValue> GetLatestDataValues() 
         {
             IDictionary<string, DataValue> result = new Dictionary<string, DataValue>();
-            
-            try
+
+            using (var connection = new MySqlConnection(this.connectionString))
             {
-                this.mySqlConnection.Open();
-
-                var fromDate = DateTime.Now.AddHours(-2);
-
-                var sql = $"SELECT * FROM DataValues WHERE Timestamp > @fromDate;";
-
-                var rows = this.mySqlConnection.Query(sql, new { fromDate = fromDate });
-
-                foreach (var row in rows)
+                try
                 {
-                    var overrideValue = false;
+                    connection.Open();
 
-                    if (result.ContainsKey(row.ValueType.ToString()) == false)
-                    {
-                        overrideValue = true;
-                    }
-                    else if (result[row.ValueType.ToString()].TimeStamp < row.TimeStamp)
-                    {
-                        overrideValue = true;
-                    }
+                    var fromDate = DateTime.Now.AddHours(-2);
 
-                    if (overrideValue == true) 
+                    var sql = $"SELECT * FROM DataValues WHERE Timestamp > @fromDate;";
+
+                    var rows = connection.Query(sql, new { fromDate = fromDate });
+
+                    foreach (var row in rows)
                     {
-                        result[row.ValueType.ToString()] = row;
+                        var overrideValue = false;
+
+                        if (result.ContainsKey(row.ValueType.ToString()) == false)
+                        {
+                            overrideValue = true;
+                        }
+                        else if (result[row.ValueType.ToString()].TimeStamp < row.TimeStamp)
+                        {
+                            overrideValue = true;
+                        }
+
+                        if (overrideValue == true) 
+                        {
+                            result[row.ValueType.ToString()] = row;
+                        }
                     }
                 }
-            }
-            finally
-            {
-                this.mySqlConnection.Close();
+                finally
+                {
+                    connection.Close();
+                }
             }
 
             return result;
@@ -193,48 +170,51 @@ namespace Heizung.ServerDotNet.Data
 
         #region SetLoggingStateOfVaueType
         /// <summary>
-        /// Erzeugt einen neuen Eintrag in der FehlerTabelle
+        /// Stellt ein, welche Heizungswerte in der Historie gespeichert werden sollen
         /// </summary>
-        /// <param name="valueTypeList">errorText Der Fehlertext von der neuen Fehlermeldung</param>
-        public void SetLoggingStateOfVaueType(IList<KeyValuePair<int, bool>> valueTypeList)
+        /// <param name="loggingStates">Die Einstellung welche gesetzt werden soll</param>
+        public void SetLoggingStateOfVaueType(IList<LoggingState> loggingStates)
         {
-            try
+            using (var connection = new MySqlConnection(this.connectionString))
             {
-                this.mySqlConnection.Open();
-
-                using (var mySqlCommand = this.mySqlConnection.CreateCommand())
+                try
                 {
-                    var sqlStringBuilder = new StringBuilder(60);
-                    sqlStringBuilder.Append("UPDATE TABLE 'ValueDescription' (Id, IsLogged) VALUE ");
+                    connection.Open();
 
-                    var isFirst = true;
-
-                    for (var i = 0; i < valueTypeList.Count; i++)
+                    using (var mySqlCommand = connection.CreateCommand())
                     {
-                        var valueType = valueTypeList[i];
+                        var sqlStringBuilder = new StringBuilder(60);
+                        sqlStringBuilder.Append("UPDATE TABLE 'ValueDescription' (Id, IsLogged) VALUE ");
 
-                        if (isFirst == true)
+                        var isFirst = true;
+
+                        for (var i = 0; i < loggingStates.Count; i++)
                         {
-                            isFirst = false;
-                        }
-                        else
-                        {
-                            sqlStringBuilder.Append(", ");
+                            var loggingState = loggingStates[i];
+
+                            if (isFirst == true)
+                            {
+                                isFirst = false;
+                            }
+                            else
+                            {
+                                sqlStringBuilder.Append(", ");
+                            }
+
+                            sqlStringBuilder.AppendFormat("(@id{0}, @value{0})", i);
+
+                            mySqlCommand.Parameters.AddWithValue("@id" + i, loggingState.ValueTypeId);
+                            mySqlCommand.Parameters.AddWithValue("@value" + i, loggingState.IsLoged);
                         }
 
-                        sqlStringBuilder.AppendFormat("(@id{0}, @value{0})", i);
-
-                        mySqlCommand.Parameters.AddWithValue("@id" + i, valueType.Key);
-                        mySqlCommand.Parameters.AddWithValue("@value" + i, valueType.Value);
+                        mySqlCommand.CommandText = sqlStringBuilder.ToString();
+                        mySqlCommand.ExecuteNonQuery();
                     }
-
-                    mySqlCommand.CommandText = sqlStringBuilder.ToString();
-                    mySqlCommand.ExecuteNonQuery();
                 }
-            }
-            finally
-            {
-                this.mySqlConnection.Close();
+                finally
+                {
+                    connection.Close();
+                }
             }
         }
         #endregion
@@ -254,48 +234,56 @@ namespace Heizung.ServerDotNet.Data
             var from = DateTime.Now.AddHours(-2);
             IList<string> valuesStrings = new List<string>();
 
-            try
-            {
-                this.mySqlConnection.Open();
-
-                var lowerThresholdQueryTask = this.mySqlConnection.QueryAsync("SELECT LowerThreshold FROM NotifierConfig;");
-                var notifierMailsQueryTask = this.mySqlConnection.QueryAsync("SELECT Mail FROM NotifierMails;");
-
-                Task.WaitAll(lowerThresholdQueryTask, notifierMailsQueryTask);
-
-                IList<Exception> exceptions = new List<Exception>();
-
-                if (lowerThresholdQueryTask.IsFaulted)
+            using (var connectionA = new MySqlConnection(this.connectionString))
+            {            
+                using (var connectionB = new MySqlConnection(this.connectionString))
                 {
-                    exceptions.Add(lowerThresholdQueryTask.Exception);
-                }
-
-                if (notifierMailsQueryTask.IsFaulted)
-                {
-                    exceptions.Add(notifierMailsQueryTask.Exception);
-                }
-
-                if (exceptions.Count > 0)
-                {
-                    throw new AggregateException("Beim ermitteln von der MailConfig ist mindestens ein Fehler aufgetreten", exceptions);
-                }
-
-                if (lowerThresholdQueryTask.Result.Count() > 0)
-                {
-                    result.LowerThreshold = lowerThresholdQueryTask.Result.ElementAt(0).LowerThreshold;
-
-                    foreach(var row in notifierMailsQueryTask.Result)
+                    try
                     {
-                        result.MailConfigs.Add(new MailConfig() 
+                        connectionA.Open();
+                        connectionB.Open();
+
+                        var lowerThresholdQueryTask = connectionA.QueryAsync("SELECT LowerThreshold FROM NotifierConfig;");
+                        var notifierMailsQueryTask = connectionB.QueryAsync("SELECT Mail FROM NotifierMails;");
+
+                        Task.WaitAll(lowerThresholdQueryTask, notifierMailsQueryTask);
+
+                        IList<Exception> exceptions = new List<Exception>();
+
+                        if (lowerThresholdQueryTask.IsFaulted)
                         {
-                            Mail = row.Mail
-                        });
+                            exceptions.Add(lowerThresholdQueryTask.Exception);
+                        }
+
+                        if (notifierMailsQueryTask.IsFaulted)
+                        {
+                            exceptions.Add(notifierMailsQueryTask.Exception);
+                        }
+
+                        if (exceptions.Count > 0)
+                        {
+                            throw new AggregateException("Beim ermitteln von der MailConfig ist mindestens ein Fehler aufgetreten", exceptions);
+                        }
+
+                        if (lowerThresholdQueryTask.Result.Count() > 0)
+                        {
+                            result.LowerThreshold = lowerThresholdQueryTask.Result.ElementAt(0).LowerThreshold;
+
+                            foreach(var row in notifierMailsQueryTask.Result)
+                            {
+                                result.MailConfigs.Add(new MailConfig() 
+                                {
+                                    Mail = row.Mail
+                                });
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        connectionA.Close();
+                        connectionB.Close();
                     }
                 }
-            }
-            finally
-            {
-                this.mySqlConnection.Close();
             }
 
             return result;
@@ -317,84 +305,99 @@ namespace Heizung.ServerDotNet.Data
                 valuesList.Add($"({i}, '{notifierConfig.MailConfigs[i].Mail}')");
             }
 
-            try
+            using (var connectionA = new MySqlConnection(this.connectionString))
             {
-                this.mySqlConnection.Open();
-
-                var updateNotifierConfigQueryTask = this.mySqlConnection.ExecuteAsync($"UPDATE NotifierConfig SET LowerThreshold = @lowerThreshhold", new { lowerThreshhold = notifierConfig.LowerThreshold });
-                
-                this.mySqlConnection.Execute("TRUNCATE TABLE NotifierMails");
-
-                using (var insertCommand = this.mySqlConnection.CreateCommand())
+                using (var connectionB = new MySqlConnection(this.connectionString))
                 {
-                    var stringBuilder = new StringBuilder(60);
-                    stringBuilder.Append("INSERT INTO NotifierMails (Id, Mail) VALUES ");
-                    
-                    var isFirst = true;
-
-                    for (var i = 0; i < notifierConfig.MailConfigs.Count; i++)
+                    try
                     {
-                        var mailConfig = notifierConfig.MailConfigs[i];
+                        connectionA.Open();
+                        connectionB.Open();
 
-                        if (isFirst == true)
+                        var updateNotifierConfigQueryTask = connectionA.ExecuteAsync($"UPDATE NotifierConfig SET LowerThreshold = @lowerThreshhold", new { lowerThreshhold = notifierConfig.LowerThreshold });
+                        
+                        connectionB.Execute("TRUNCATE TABLE NotifierMails");
+
+                        using (var insertCommand = connectionB.CreateCommand())
                         {
-                            isFirst = false;
-                        }
-                        else
-                        {
-                            stringBuilder.Append(", ");
+                            var stringBuilder = new StringBuilder(60);
+                            stringBuilder.Append("INSERT INTO NotifierMails (Id, Mail) VALUES ");
+                            
+                            var isFirst = true;
+
+                            for (var i = 0; i < notifierConfig.MailConfigs.Count; i++)
+                            {
+                                var mailConfig = notifierConfig.MailConfigs[i];
+
+                                if (isFirst == true)
+                                {
+                                    isFirst = false;
+                                }
+                                else
+                                {
+                                    stringBuilder.Append(", ");
+                                }
+
+                                stringBuilder.AppendFormat("(@id{0}, @mail{0})", i);
+                                insertCommand.Parameters.AddWithValue("@id" + i, i);
+                                insertCommand.Parameters.AddWithValue("@mail" + i, mailConfig.Mail);
+                            }
+
+                            insertCommand.CommandText = stringBuilder.ToString();
+                            insertCommand.ExecuteNonQuery();
                         }
 
-                        stringBuilder.AppendFormat("(@id{0}, @mail{0})", i);
-                        insertCommand.Parameters.AddWithValue("@id" + i, i);
-                        insertCommand.Parameters.AddWithValue("@mail" + i, mailConfig.Mail);
+                        updateNotifierConfigQueryTask.Wait();
+
+                        if (updateNotifierConfigQueryTask.IsFaulted)
+                        {
+                            throw updateNotifierConfigQueryTask.Exception;
+                        }
                     }
-
-                    insertCommand.CommandText = stringBuilder.ToString();
-                    insertCommand.ExecuteNonQuery();
+                    finally
+                    {
+                        connectionA.Close();
+                        connectionB.Close();
+                    }
                 }
-
-                updateNotifierConfigQueryTask.Wait();
-
-                if (updateNotifierConfigQueryTask.IsFaulted)
-                {
-                    throw updateNotifierConfigQueryTask.Exception;
-                }
-            }
-            finally
-            {
-                this.mySqlConnection.Close();
             }
         }
         #endregion
 
-        #region GetAllErrorHashtable
+        #region GetAllErrorDictionary
         /// <summary>
-        /// Ermittelt eine Hashtable mit allen Fehlern
+        /// Ermittelt eine Dictionary mit allen Fehlern
         /// </summary>
         /// <exception type="Exception">Wird geworfen, wenn ein Datenbankfehler auftritt</exception>
         /// <returns>Gibt die Fehler als Dictionary zurück</returns>
-        public IDictionary<int, string> GetAllErrorHashtable()
+        public IDictionary<int, ErrorDescription> GetAllErrorDictionary()
         {
-            IDictionary<int, string> result = new Dictionary<int, string>();
+            IDictionary<int, ErrorDescription> result = new Dictionary<int, ErrorDescription>();
 
-            try
+            using (var connection = new MySqlConnection(this.connectionString))
             {
-                this.mySqlConnection.Open();
-
-                var rows = this.mySqlConnection.Query("SELECT * FROM Heizung.ErrorList");
-
-                foreach (var row in rows)
+                try
                 {
-                    if (result.ContainsKey(row.Id) == false)
+                    connection.Open();
+
+                    var rows = connection.Query("SELECT * FROM Heizung.ErrorList");
+
+                    foreach (var row in rows)
                     {
-                        result.Add(row.Id, row.Description);
+                        if (result.ContainsKey((int)row.Id) == false)
+                        {
+                            result.Add((int)row.Id, new ErrorDescription()
+                            {
+                                Id = (int)row.Id,
+                                Description = row.Description
+                            });
+                        }
                     }
                 }
-            }
-            finally
-            {
-                this.mySqlConnection.Close();
+                finally
+                {
+                    connection.Close();
+                }
             }
 
             return result;
@@ -412,20 +415,23 @@ namespace Heizung.ServerDotNet.Data
         {
             var result = 0;
 
-            try
+            using (var connection = new MySqlConnection(this.connectionString))
             {
-                this.mySqlConnection.Open();
+                try
+                {
+                    connection.Open();
 
-                var transaction = this.mySqlConnection.BeginTransaction();
+                    var transaction = connection.BeginTransaction();
 
-                this.mySqlConnection.Execute($"INSERT INTO 'ErrorList' (Description) VALUE (@errorText)", param: new { errorText = errorText}, transaction: transaction);
-                result = this.mySqlConnection.QuerySingle<int>("Select LAST_INSERT_ID()", transaction);
+                    connection.Execute($"INSERT INTO 'ErrorList' (Description) VALUE (@errorText)", param: new { errorText = errorText}, transaction: transaction);
+                    result = connection.QuerySingle<int>("Select LAST_INSERT_ID()", transaction);
 
-                transaction.Commit();
-            }
-            finally
-            {
-                this.mySqlConnection.Close();
+                    transaction.Commit();
+                }
+                finally
+                {
+                    connection.Close();
+                }
             }
 
             return result;
@@ -452,46 +458,49 @@ namespace Heizung.ServerDotNet.Data
                 }
             }
 
-            try
+            using (var connection = new MySqlConnection(this.connectionString))
             {
-                this.mySqlConnection.Open();
-
-                using (var insertCommand = this.mySqlConnection.CreateCommand())
+                try
                 {
-                    var sqlStringBuilder = new StringBuilder(80);
-                    sqlStringBuilder.Append("INSERT INTO Heizung.DataValues (ValueType, Value, Timestamp) VALUES ");
+                    connection.Open();
 
-                    for (var i = 0; i < heaterDataDictonary.Count; i++)
+                    using (var insertCommand = connection.CreateCommand())
                     {
-                        var isFirst = true;
+                        var sqlStringBuilder = new StringBuilder(80);
+                        sqlStringBuilder.Append("INSERT INTO Heizung.DataValues (ValueType, Value, Timestamp) VALUES ");
 
-                        for (var j = 0; j < heaterDataDictonary[i].Data.Count; j++)
+                        for (var i = 0; i < heaterDataDictonary.Count; i++)
                         {
-                            if (isFirst == true)
-                            {
-                                isFirst = false;
-                            }
-                            else
-                            {
-                                sqlStringBuilder.Append(", ");
-                            }
+                            var isFirst = true;
 
-                            sqlStringBuilder.AppendFormat("@valueType{0}x{1}, @value{0}x{1}, @timestamp{0}x{1}", i, j);
-                            insertCommand.Parameters.AddWithValue($"@valueType{i}x{j}", heaterDataDictonary[i].ValueTypeId);
-                            insertCommand.Parameters.AddWithValue($"@value{i}x{j}", heaterDataDictonary[i].Data[j].Value);
-                            insertCommand.Parameters.AddWithValue($"@timestamp{i}x{j}", heaterDataDictonary[i].Data[j].TimeStamp);
+                            for (var j = 0; j < heaterDataDictonary[i].Data.Count; j++)
+                            {
+                                if (isFirst == true)
+                                {
+                                    isFirst = false;
+                                }
+                                else
+                                {
+                                    sqlStringBuilder.Append(", ");
+                                }
+
+                                sqlStringBuilder.AppendFormat("@valueType{0}x{1}, @value{0}x{1}, @timestamp{0}x{1}", i, j);
+                                insertCommand.Parameters.AddWithValue($"@valueType{i}x{j}", heaterDataDictonary[i].ValueTypeId);
+                                insertCommand.Parameters.AddWithValue($"@value{i}x{j}", heaterDataDictonary[i].Data[j].Value);
+                                insertCommand.Parameters.AddWithValue($"@timestamp{i}x{j}", heaterDataDictonary[i].Data[j].TimeStamp);
+                            }
                         }
+
+                        insertCommand.CommandText = sqlStringBuilder.ToString();
+                        insertCommand.ExecuteNonQuery();
                     }
 
-                    insertCommand.CommandText = sqlStringBuilder.ToString();
-                    insertCommand.ExecuteNonQuery();
+                    connection.Execute($"INSERT INTO Heizung.DataValues (ValueType, Value, Timestamp) VALUES {string.Join(", ", insertValues)}");
                 }
-
-                this.mySqlConnection.Execute($"INSERT INTO Heizung.DataValues (ValueType, Value, Timestamp) VALUES {string.Join(", ", insertValues)}");
-            }
-            finally
-            {
-                this.mySqlConnection.Close();
+                finally
+                {
+                    connection.Close();
+                }
             }
         }
         #endregion
