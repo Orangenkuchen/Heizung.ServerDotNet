@@ -10,10 +10,12 @@ namespace Heizung.ServerDotNet
     using Heizung.ServerDotNet.Data;
     using Heizung.ServerDotNet.Mail;
     using Heizung.ServerDotNet.Service;
+    using Heizung.ServerDotNet.SignalRHubs;
     using Microsoft.AspNetCore.Builder;
     using Microsoft.AspNetCore.Hosting;
     using Microsoft.AspNetCore.HttpsPolicy;
     using Microsoft.AspNetCore.Mvc;
+    using Microsoft.AspNetCore.SignalR;
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Hosting;
@@ -67,6 +69,8 @@ namespace Heizung.ServerDotNet
             services.AddSingleton<IHeaterDataService, HeaterDataService>();
 
             services.AddControllers();
+            services.AddSignalR();
+
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "Heizung.ServerDotNet", Version = "v1", });
@@ -104,6 +108,13 @@ namespace Heizung.ServerDotNet
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapControllers();
+                endpoints.MapHub<HeaterDataHub>("/HeaterDataHub");
+
+                var heaterDataHubContext = app.ApplicationServices.GetService<IHubContext<HeaterDataHub>>();
+                app.ApplicationServices.GetService<IHeaterDataService>().NewDataEvent += (currentHeaterDataDictionary) =>
+                {
+                    heaterDataHubContext.Clients.All.SendCoreAsync("CurrentHeaterData", new object[] { currentHeaterDataDictionary });
+                };
             });
         }
         #endregion

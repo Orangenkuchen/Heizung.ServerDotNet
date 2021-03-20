@@ -1,5 +1,6 @@
 namespace Heizung.ServerDotNet.Service
 {
+    using System;
     using System.Collections.Generic;
     using Heizung.ServerDotNet.Entities;
 
@@ -8,6 +9,13 @@ namespace Heizung.ServerDotNet.Service
     /// </summary>
     public interface IHeaterDataService
     {
+        #region events
+        /// <summary>
+        /// Wird ausgeführt, wenn neue Daten angekommen sind
+        /// </summary>
+        event Action<IDictionary<int, HeaterData>> NewDataEvent;
+        #endregion
+
         #region CurrentHeaterValues
         /// <summary>
         /// Dicitonary mit den aktuellen Heizungsdaten
