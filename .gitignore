@@ -2,3 +2,5 @@
 /obj
 appsettings.Development.json
 appsettings.json
+cert.pem
+key.pem
