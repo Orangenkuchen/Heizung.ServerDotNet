@@ -7,6 +7,17 @@ namespace Heizung.ServerDotNet.Entities
     /// </summary>
     public class HeaterDataPoint
     {
+        #region ctor
+        /// <summary>
+        /// Initialisiert die Klasse
+        /// </summary>
+        /// <param name="value">Der Wert vom Datenpunkt</param>
+        public HeaterDataPoint(object value)
+        {
+            this.Value = value;
+        }
+        #endregion
+
         #region TimeStamp
         /// <summary>
         /// Der Timestamp vom Datenpunkt

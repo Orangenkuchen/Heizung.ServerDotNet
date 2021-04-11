@@ -7,6 +7,20 @@ namespace Heizung.ServerDotNet.Entities
     /// </summary>
     public class HeaterData
     {
+        #region ctor
+        /// <summary>
+        /// Initialisiert die Klasse
+        /// </summary>
+        /// <param name="description">Die Beschreibung der Heizungsdaten</param>
+        /// <param name="unit"></param>
+        public HeaterData(string description, string unit)
+        {
+            this.Description = description;
+            this.Unit = unit;
+            this.Data = new List<HeaterDataPoint>();
+        }
+        #endregion
+
         #region ValueTypeId
         /// <summary>
         /// Die Id vom Heizwerttyp

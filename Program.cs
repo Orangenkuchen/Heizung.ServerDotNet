@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Server.Kestrel.Https;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -24,13 +26,13 @@ namespace Heizung.ServerDotNet
         {
             var logfilePath = System.IO.Path.Combine(
                 System.Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), 
-                System.Reflection.Assembly.GetExecutingAssembly().GetName().Name, 
+                System.Reflection.Assembly.GetExecutingAssembly().GetName().Name ?? "", 
                 "Log.txt");
 
             Log.Logger = new LoggerConfiguration()
                 .Enrich.FromLogContext()
                 .WriteTo.Console()
-                .WriteTo.File(logfilePath)
+                .WriteTo.File(logfilePath, fileSizeLimitBytes: 10 * 1024 * 1024)
                 .CreateLogger();
 
             AppDomain currentDomain = AppDomain.CurrentDomain;
@@ -62,8 +64,9 @@ namespace Heizung.ServerDotNet
         {
             return Host.CreateDefaultBuilder(args)
                 .UseSerilog() // Überschreibt das Logging mit Serilog
+                .UseSystemd()
                 .ConfigureWebHostDefaults(webBuilder =>
-                {
+                {                    
                     webBuilder.UseStartup<Startup>();
                 }
             );

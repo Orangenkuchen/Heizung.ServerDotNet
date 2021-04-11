@@ -38,7 +38,7 @@ namespace Heizung.ServerDotNet.Controllers
         }
         #endregion
 
-        #region Configuration
+        #region Configuration GET
         /// <summary>
         /// Ermittelt die Configuration für die Mailbenarichtigung
         /// </summary>
@@ -48,7 +48,9 @@ namespace Heizung.ServerDotNet.Controllers
         {
             return base.Ok(this.heaterRepository.GetMailNotifierConfig());
         }
+        #endregion
 
+        #region Configuration PUT
         /// <summary>
         /// Setzt  die Configuration für die Mailbenarichtigung
         /// </summary>

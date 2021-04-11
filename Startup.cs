@@ -56,17 +56,19 @@ namespace Heizung.ServerDotNet
         {
             Serilog.Log.Debug("Konfiguriere die Services vom Webserver");
 
-            var mailConfig = new MailConfiguration()
+            var mailConfig = new MailConfiguration(
+                this.Configuration["MailConfig:WarningMail:SmtpHostServer"], 
+                new NetworkCredential(this.Configuration["MailConfig:WarningMail:UserName"], this.Configuration["MailConfig:WarningMail:UserPassword"]))
             {
-                SmtpServer = this.Configuration["MailConfig:WarningMail:SmtpHostServer"],
-                SmtpServerPort = this.Configuration.GetValue<uint>("MailConfig:WarningMail:SmtpHostPort"),
-                SmtpServerCredential = new NetworkCredential(this.Configuration["MailConfig:WarningMail:UserName"], this.Configuration["MailConfig:WarningMail:UserPassword"])
+                SmtpServerPort = this.Configuration.GetValue<uint>("MailConfig:WarningMail:SmtpHostPort")
             };
 
             services.AddSingleton<MailConfiguration>(mailConfig);
 
             services.AddSingleton<IHeaterRepository>(new HeaterRepository(this.Configuration.GetConnectionString("HeaterDatabase")));
             services.AddSingleton<IHeaterDataService, HeaterDataService>();
+
+            services.AddCors();
 
             services.AddControllers();
             services.AddSignalR();
@@ -92,18 +94,31 @@ namespace Heizung.ServerDotNet
         /// <param name="env">WebHostEnvironment</param>
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
+
+            app.UseCors(
+                builder => 
+                {
+                    builder.AllowAnyOrigin();
+                    builder.AllowAnyMethod();
+                    builder.AllowAnyHeader(); 
+                }
+            );
+
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
-                app.UseSwagger();
-                app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Heizung.ServerDotNet v1"));
             }
+            
+            app.UseSwagger();
+            app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Heizung.ServerDotNet v1"));
 
             app.UseHttpsRedirection();
 
             app.UseRouting();
 
             app.UseAuthorization();
+
+            app.UseAuthentication();
 
             app.UseEndpoints(endpoints =>
             {

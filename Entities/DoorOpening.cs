@@ -12,7 +12,7 @@ namespace Heizung.ServerDotNet.Entities
         /// Der Zeitpunkt an dem die Tür geöffnet wurde
         /// </summary>
         /// <value></value>
-        public DateTime? StartDateTime { get; set; }
+        public DateTime StartDateTime { get; set; }
         #endregion
 
         #region EndDateTime

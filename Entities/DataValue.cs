@@ -7,6 +7,17 @@ namespace Heizung.ServerDotNet.Entities
     /// </summary>
     public class DataValue
     {
+        #region ctor
+        /// <summary>
+        /// Initalisiert die Klasse
+        /// </summary>
+        /// <param name="value">Der Wert von den Daten</param>
+        public DataValue(object value)
+        {
+            this.Value = value;
+        }
+        #endregion
+
         #region Id
         /// <summary>
         /// Die Id vom Wert

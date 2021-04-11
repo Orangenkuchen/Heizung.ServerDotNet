@@ -5,6 +5,17 @@ namespace Heizung.ServerDotNet.Entities
     /// </summary>
     public class MailConfig
     {
+        #region ctor
+        /// <summary>
+        /// Initialisiert die Klasse
+        /// </summary>
+        /// <param name="mail">Die Mailadresse von der Config</param>
+        public MailConfig(string mail)
+        {
+            this.Mail = mail;
+        }
+        #endregion
+
         #region Mail
         /// <summary>
         /// Die Adresse

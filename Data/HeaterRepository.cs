@@ -59,10 +59,8 @@ namespace Heizung.ServerDotNet.Data
 
                     foreach(var row in rows)
                     {
-                        result.Add(new ValueDescription() {
+                        result.Add(new ValueDescription(row.Description, row.Unit) {
                             Id = row.Id,
-                            Description = row.Description,
-                            Unit = row.Unit,
                             IsLogged = Convert.ToBoolean(row.IsLogged)
                         });
                     }
@@ -100,10 +98,9 @@ namespace Heizung.ServerDotNet.Data
 
                     foreach(var row in rows)
                     {
-                        result.Add(new DataValue() {
+                        result.Add(new DataValue(row.Value) {
                             Id = (int)row.Id,
                             TimeStamp = row.Timestamp,
-                            Value = row.Value,
                             ValueType = row.ValueType
                         });
                     }
@@ -252,12 +249,12 @@ namespace Heizung.ServerDotNet.Data
 
                         if (lowerThresholdQueryTask.IsFaulted)
                         {
-                            exceptions.Add(lowerThresholdQueryTask.Exception);
+                            exceptions.Add(lowerThresholdQueryTask.Exception ?? new Exception());
                         }
 
                         if (notifierMailsQueryTask.IsFaulted)
                         {
-                            exceptions.Add(notifierMailsQueryTask.Exception);
+                            exceptions.Add(notifierMailsQueryTask.Exception ?? new Exception());
                         }
 
                         if (exceptions.Count > 0)
@@ -271,10 +268,7 @@ namespace Heizung.ServerDotNet.Data
 
                             foreach(var row in notifierMailsQueryTask.Result)
                             {
-                                result.MailConfigs.Add(new MailConfig() 
-                                {
-                                    Mail = row.Mail
-                                });
+                                result.MailConfigs.Add(new MailConfig(row.Mail));
                             }
                         }
                     }
@@ -305,9 +299,9 @@ namespace Heizung.ServerDotNet.Data
                 valuesList.Add($"({i}, '{notifierConfig.MailConfigs[i].Mail}')");
             }
 
-            using (var connectionA = new MySqlConnection(this.connectionString))
+            using (MySqlConnection connectionA = new MySqlConnection(this.connectionString))
             {
-                using (var connectionB = new MySqlConnection(this.connectionString))
+                using (MySqlConnection connectionB = new MySqlConnection(this.connectionString))
                 {
                     try
                     {
@@ -351,7 +345,7 @@ namespace Heizung.ServerDotNet.Data
 
                         if (updateNotifierConfigQueryTask.IsFaulted)
                         {
-                            throw updateNotifierConfigQueryTask.Exception;
+                            throw updateNotifierConfigQueryTask.Exception ?? new Exception();
                         }
                     }
                     finally
@@ -386,10 +380,9 @@ namespace Heizung.ServerDotNet.Data
                     {
                         if (result.ContainsKey((int)row.Id) == false)
                         {
-                            result.Add((int)row.Id, new ErrorDescription()
+                            result.Add((int)row.Id, new ErrorDescription(row.Description)
                             {
-                                Id = (int)row.Id,
-                                Description = row.Description
+                                Id = (int)row.Id
                             });
                         }
                     }

@@ -5,6 +5,21 @@ namespace Heizung.ServerDotNet.Entities
     /// </summary>
     public class HeaterSerialDataValue
     {
+        #region ctor
+        /// <summary>
+        /// Initialisiert die Klasse
+        /// </summary>
+        /// <param name="name">Der Name vom Wert</param>
+        /// <param name="value">Der Wert</param>
+        /// <param name="unit">Die Einheit vom Wert</param>
+        public HeaterSerialDataValue(string name, string value, string unit)
+        {
+            this.Name = name;
+            this.Value = value;
+            this.Unit = unit;
+        }
+        #endregion
+
         #region Name
         /// <summary>
         /// Der Name vom gelesenen Wert

@@ -7,6 +7,19 @@ namespace Heizung.ServerDotNet.Mail
     /// </summary>
     public class MailConfiguration
     {
+        #region ctor
+        /// <summary>
+        /// Initialisiert die Klasse
+        /// </summary>
+        /// <param name="smtpServer">Die Serveradresse von der Mail</param>
+        /// <param name="smtpServerCredential">Die Zugangsdaten zum Mail-Konto</param>
+        public MailConfiguration(string smtpServer, NetworkCredential smtpServerCredential)
+        {
+            this.SmtpServer = smtpServer;
+            this.SmtpServerCredential = smtpServerCredential;
+        }
+        #endregion
+
         #region SmtpServer
         /// <summary>
         /// Die Serveradresse von der Mail

@@ -56,7 +56,7 @@ namespace Heizung.ServerDotNet.Service
         /// <summary>
         /// Wird ausgeführt, wenn neue Daten angekommen sind
         /// </summary>
-        public event Action<IDictionary<int, HeaterData>> NewDataEvent;
+        public event Action<IDictionary<int, HeaterData>>? NewDataEvent;
         #endregion
 
         #region CurrentHeaterValues
@@ -132,7 +132,6 @@ namespace Heizung.ServerDotNet.Service
             }
 
             this.destroyFunctions.Clear();
-            this.destroyFunctions = null;
         }
         #endregion
 
@@ -156,17 +155,14 @@ namespace Heizung.ServerDotNet.Service
             foreach (var heaterValue in heaterValues)
             {
                 var dataList = new List<HeaterDataPoint>();
-                dataList.Add(new HeaterDataPoint()
+                dataList.Add(new HeaterDataPoint(0)
                 {
-                    TimeStamp = DateTime.Now,
-                    Value = 0
+                    TimeStamp = DateTime.Now
                 });
 
-                var newHeaterData = new HeaterData()
+                var newHeaterData = new HeaterData(heaterValue.Name, heaterValue.Unit)
                 {
-                    Description = heaterValue.Name,
                     IsLogged = false,
-                    Unit = heaterValue.Unit,
                     ValueTypeId = heaterValue.Index,
                     Data = dataList
                 };
@@ -197,10 +193,9 @@ namespace Heizung.ServerDotNet.Service
 
                         if (errorDictionary.ContainsKey(errorId.Value))
                         {
-                            errorDictionary.Add(errorId.Value, new ErrorDescription()
+                            errorDictionary.Add(errorId.Value, new ErrorDescription(errorValue)
                             {
-                                Id = errorId.Value,
-                                Description = errorValue
+                                Id = errorId.Value
                             });
                         }
                     }
@@ -229,7 +224,7 @@ namespace Heizung.ServerDotNet.Service
                 if (isNewData)
                 {
                     this.CurrentHeaterValues[newHeaterData.ValueTypeId].Data[0].Value = newHeaterData.Data[0].Value;
-                    this.NewDataEvent.Invoke(this.CurrentHeaterValues);
+                    this.NewDataEvent?.Invoke(this.CurrentHeaterValues);
                 }
             }
 
@@ -255,13 +250,10 @@ namespace Heizung.ServerDotNet.Service
             {
                 var doorOpeningsValueDescription = heaterValuesDescriptionDictionary[200];
 
-                this.CurrentHeaterValues[200] = new HeaterData()
+                this.CurrentHeaterValues[200] = new HeaterData(doorOpeningsValueDescription.Description, doorOpeningsValueDescription.Unit)
                 {
                     ValueTypeId = 200,
-                    Data = new List<HeaterDataPoint>(),
-                    Description = doorOpeningsValueDescription.Description,
                     IsLogged = doorOpeningsValueDescription.IsLogged,
-                    Unit = doorOpeningsValueDescription.Unit
                 };
             }
 
@@ -312,10 +304,9 @@ namespace Heizung.ServerDotNet.Service
 
             if (this.CurrentHeaterValues[200].Data.Count == 0)
             {
-                this.CurrentHeaterValues[200].Data[0] = new HeaterDataPoint()
+                this.CurrentHeaterValues[200].Data[0] = new HeaterDataPoint(0)
                 {
-                    TimeStamp = DateTime.Now,
-                    Value = 0
+                    TimeStamp = DateTime.Now
                 };
 
                 if (result == true)
@@ -343,11 +334,11 @@ namespace Heizung.ServerDotNet.Service
             {
                 if (doopOpening.EndDateTime == null)
                 {
-                    result += DateTime.Now - doopOpening.StartDateTime.Value;
+                    result += DateTime.Now - doopOpening.StartDateTime;
                 }
                 else
                 {
-                    result += doopOpening.EndDateTime.Value - doopOpening.StartDateTime.Value;
+                    result += doopOpening.EndDateTime.Value - doopOpening.StartDateTime;
                 }
             }
 

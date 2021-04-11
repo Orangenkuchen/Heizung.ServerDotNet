@@ -48,20 +48,7 @@ namespace Heizung.ServerDotNet.Controllers
         }
         #endregion
 
-        #region GetLatest
-        /// <summary>
-        /// Ermittelt die Heizungsdaten welche zuletzt empfangen wurden
-        /// </summary>
-        /// <returns>Gibt die Daten als IDictionary zurück</returns>
-        [HttpGet]
-        public ActionResult<IDictionary<int, HeaterData>> GetLatest()
-        {
-            this.logger.LogTrace("GetLatest called");
-            return base.Ok(this.heaterDataService.CurrentHeaterValues);
-        }
-        #endregion
-
-        #region Get
+        #region Data
         /// <summary>
         /// Ermittelt die Heizungsdaten im angegeben Zeitraum
         /// </summary>
@@ -69,7 +56,7 @@ namespace Heizung.ServerDotNet.Controllers
         /// <param name="toDate">Der Endzeitpunkt der Datenbeschaffung</param>
         /// <returns>Gibt die Daten als IDictionary zurück</returns>
         [HttpGet]
-        public ActionResult<IDictionary<int, HeaterData>> Get(DateTime fromDate, DateTime toDate)
+        public ActionResult<IDictionary<int, HeaterData>> Data(DateTime fromDate, DateTime toDate)
         {
             this.logger.LogTrace("Get called");
             IDictionary<int, HeaterData> result = new Dictionary<int, HeaterData>();
@@ -82,13 +69,10 @@ namespace Heizung.ServerDotNet.Controllers
             {
                 result.Add(
                     valueDescription.Id, 
-                    new HeaterData()
+                    new HeaterData(valueDescription.Description, valueDescription.Unit)
                     {
                         ValueTypeId = valueDescription.Id,
-                        Description = valueDescription.Description,
-                        IsLogged = valueDescription.IsLogged,
-                        Unit = valueDescription.Unit,
-                        Data = new List<HeaterDataPoint>()
+                        IsLogged = valueDescription.IsLogged
                     });
             }
 
@@ -109,10 +93,9 @@ namespace Heizung.ServerDotNet.Controllers
                         }
                     }
 
-                    result[dataPoint.ValueType].Data.Add(new HeaterDataPoint()
+                    result[dataPoint.ValueType].Data.Add(new HeaterDataPoint(dataPoint.Value)
                     {
-                        TimeStamp = dataPoint.TimeStamp,
-                        Value = dataPoint.Value
+                        TimeStamp = dataPoint.TimeStamp
                     });
                 }
                 else
@@ -131,60 +114,73 @@ namespace Heizung.ServerDotNet.Controllers
         }
         #endregion
 
-        #region GetValueDescriptions
+        #region ValueDescriptions
         /// <summary>
         /// Ermittelt die Beschreibungen zu den Heizungsdaten
         /// </summary>
         /// <returns>Gibt die Daten als IDictionary zurück</returns>
         [HttpGet]
-        public ActionResult<IDictionary<int, ValueDescription>> GetValueDescriptions()
+        public ActionResult<IDictionary<int, ValueDescription>> ValueDescriptions()
         {
-            this.logger.LogTrace("GetValueDescriptions called");
+            this.logger.LogTrace("ValueDescriptions called");
             IDictionary<int, ValueDescription> result = new Dictionary<int, ValueDescription>();
 
             var valueDescriptions = this.heaterRepository.GetAllValueDescriptions();
             
             result = valueDescriptions.ToDictionary((x) => x.Id);
 
-            this.logger.LogTrace("GetValueDescriptions finished");
+            this.logger.LogTrace("ValueDescriptions finished");
             return base.Ok(result);
         }
         #endregion
 
-        #region SetHeaterData
+        #region Latest GET
+        /// <summary>
+        /// Ermittelt die Heizungsdaten welche zuletzt empfangen wurden
+        /// </summary>
+        /// <returns>Gibt die Daten als IDictionary zurück</returns>
+        [HttpGet]
+        public ActionResult<IDictionary<int, HeaterData>> Latest()
+        {
+            this.logger.LogTrace("Latest called");
+            return base.Ok(this.heaterDataService.CurrentHeaterValues);
+        }
+        #endregion
+
+        #region Latest PUT
         /// <summary>
         /// Setzt die neuen Heizungsdaten als aktuelle Daten
         /// </summary>
         /// <param name="heaterData">Die Heizungsdaten welche gesetzt werden sollen</param>
         /// <returns></returns>
         [HttpPut]
-        public ActionResult SetHeaterData([FromBody]IList<HeaterData> heaterData)
+        public ActionResult Latest([FromBody]IList<HeaterData> heaterData)
         {
-            this.logger.LogTrace("SetHeaterData called");
+            this.logger.LogTrace("Latest called");
 
             IDictionary<int, HeaterData> dataToSave = heaterData.ToDictionary((x) => x.ValueTypeId);
 
             this.heaterRepository.SetHeaterValue(dataToSave);
 
-            this.logger.LogTrace("SetHeaterData finished");
+            this.logger.LogTrace("Latest finished");
             return base.NoContent();
         }
         #endregion
 
-        #region SetLoggingState
+        #region LoggingState
         /// <summary>
         /// Stellt ein, welche Daten in der Historie aufgezeichnet werden
         /// </summary>
         /// <param name="loggingStates">Die Heizungsdaten welche gesetzt werden sollen</param>
         /// <returns>Gibt die Daten als IDictionary zurück</returns>
         [HttpPut]
-        public ActionResult SetLoggingState([FromBody]IList<LoggingState> loggingStates)
+        public ActionResult LoggingState([FromBody]IList<LoggingState> loggingStates)
         {
-            this.logger.LogTrace("SetLoggingState called");
+            this.logger.LogTrace("LoggingState called");
 
             this.heaterRepository.SetLoggingStateOfVaueType(loggingStates);
 
-            this.logger.LogTrace("SetLoggingState finished");
+            this.logger.LogTrace("LoggingState finished");
             return base.NoContent();
         }
         #endregion

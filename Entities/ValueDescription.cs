@@ -5,6 +5,19 @@ namespace Heizung.ServerDotNet.Entities
     /// </summary>
     public class ValueDescription
     {
+        #region ctor
+        /// <summary>
+        /// Initialisiert die Klasse
+        /// </summary>
+        /// <param name="description">Die Berschreibung vom Wert</param>
+        /// <param name="unit">Die Einheit vom Wert</param>
+        public ValueDescription(string description, string unit)
+        {
+            this.Description = description;
+            this.Unit = unit;
+        }
+        #endregion
+
         #region Id
         /// <summary>
         /// Die Nummer/Id welche die ValueDescription hat
@@ -34,7 +47,7 @@ namespace Heizung.ServerDotNet.Entities
         /// Die Einheit vom ValueDescription
         /// </summary>
         /// <value></value>
-        public string Unit { get; set; }
+        public string? Unit { get; set; }
         #endregion
     }
 }

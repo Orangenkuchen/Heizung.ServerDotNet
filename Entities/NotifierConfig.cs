@@ -7,6 +7,16 @@ namespace Heizung.ServerDotNet.Entities
     /// </summary>
     public class NotifierConfig
     {
+        #region ctor
+        /// <summary>
+        /// Initialisiert die Klasse
+        /// </summary>
+        public NotifierConfig()
+        {
+            this.MailConfigs = new List<MailConfig>();
+        }
+        #endregion
+
         #region LowerThreshold
         /// <summary>
         /// Die Untergrenze vom Puffer ab wann die Mailbenarichtigungen gesendet werden
