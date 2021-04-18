@@ -91,7 +91,12 @@ namespace Heizung.ServerDotNet.Controllers
                 message = "<{clientIdentification}> " + message;
                 if (options.Error != null)
                 {
-                    message += string.Format(" ({0})", options.Error);
+                    var stringError = options.Error.ToString();
+
+                    stringError = stringError.Replace("{", "{{");
+                    stringError = stringError.Replace("}", "}}");
+
+                    message += string.Format(" ({0})", stringError);
                 }
 
                 options.Parameters.Insert(0, clientIdentification);

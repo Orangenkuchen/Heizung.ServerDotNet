@@ -22,6 +22,8 @@ namespace Heizung.ServerDotNet
     using Microsoft.Extensions.Logging;
     using Microsoft.OpenApi.Models;
     using MySqlConnector;
+    using FluentMigrator.Runner;
+    using FluentMigrator.Runner.Initialization;
 
     /// <summary>
     /// Diese Klasse wird beim Starten des Webservers aufgerufen und konfiguriert diesen
@@ -64,6 +66,16 @@ namespace Heizung.ServerDotNet
             };
 
             services.AddSingleton<MailConfiguration>(mailConfig);
+            
+            services.AddFluentMigratorCore();
+            services.ConfigureRunner(migrationRunnerBuilder => 
+            {
+                migrationRunnerBuilder.AddSQLite();
+                migrationRunnerBuilder.WithGlobalConnectionString("Data Source=test.db");
+                //migrationRunnerBuilder.AddMySql5();
+                //migrationRunnerBuilder.WithGlobalConnectionString(this.Configuration.GetConnectionString("HeaterDatabase"));
+                migrationRunnerBuilder.ScanIn(typeof(Migrations._0000_Empty).Assembly).For.Migrations();
+            });
 
             services.AddSingleton<IHeaterRepository>(new HeaterRepository(this.Configuration.GetConnectionString("HeaterDatabase")));
             services.AddSingleton<IHeaterDataService, HeaterDataService>();
@@ -94,16 +106,6 @@ namespace Heizung.ServerDotNet
         /// <param name="env">WebHostEnvironment</param>
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-
-            app.UseCors(
-                builder => 
-                {
-                    builder.AllowAnyOrigin();
-                    builder.AllowAnyMethod();
-                    builder.AllowAnyHeader(); 
-                }
-            );
-
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
@@ -120,18 +122,32 @@ namespace Heizung.ServerDotNet
 
             app.UseAuthentication();
 
+            app.UseCors(
+                builder => 
+                {
+                    builder.WithOrigins("http://localhost:4200", "http://***REMOVED***")
+                           .AllowAnyMethod()
+                           .AllowAnyHeader()
+                           .AllowCredentials(); 
+                }
+            );
+
             app.UseEndpoints(endpoints =>
             {
+                //var migrationRunner = endpoints.ServiceProvider.GetRequiredService<IMigrationRunner>();
+                //migrationRunner?.MigrateUp();
+
                 endpoints.MapControllers();
                 endpoints.MapHub<HeaterDataHub>("/HeaterDataHub");
 
                 var heaterDataHubContext = app.ApplicationServices.GetService<IHubContext<HeaterDataHub>>();
                 app.ApplicationServices.GetService<IHeaterDataService>().NewDataEvent += (currentHeaterDataDictionary) =>
                 {
-                    heaterDataHubContext.Clients.All.SendCoreAsync("CurrentHeaterData", new object[] { currentHeaterDataDictionary });
+                    heaterDataHubContext.Clients.All.SendAsync("CurrentHeaterData", currentHeaterDataDictionary);
                 };
             });
         }
         #endregion
+
     }
 }

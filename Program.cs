@@ -66,7 +66,7 @@ namespace Heizung.ServerDotNet
                 .UseSerilog() // Überschreibt das Logging mit Serilog
                 .UseSystemd()
                 .ConfigureWebHostDefaults(webBuilder =>
-                {                    
+                {
                     webBuilder.UseStartup<Startup>();
                 }
             );

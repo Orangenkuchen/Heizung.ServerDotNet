@@ -40,7 +40,10 @@ namespace Heizung.ServerDotNet.Controllers
         /// <param name="logger">Service für Lognachrichten</param>
         /// <param name="heaterDataService">Service für die aktuellen Heizungsdaten</param>
         /// <param name="heaterRepository">Repository für die Historiendaten der Heizung</param>
-        public HeaterDataController(ILogger<HeaterDataController> logger, IHeaterDataService heaterDataService, IHeaterRepository heaterRepository)
+        public HeaterDataController(
+            ILogger<HeaterDataController> logger, 
+            IHeaterDataService heaterDataService, 
+            IHeaterRepository heaterRepository)
         {
             this.logger = logger;
             this.heaterDataService = heaterDataService;
@@ -151,16 +154,14 @@ namespace Heizung.ServerDotNet.Controllers
         /// <summary>
         /// Setzt die neuen Heizungsdaten als aktuelle Daten
         /// </summary>
-        /// <param name="heaterData">Die Heizungsdaten welche gesetzt werden sollen</param>
+        /// <param name="heaterValues">Die Heizungsdaten welche gesetzt werden sollen</param>
         /// <returns></returns>
         [HttpPut]
-        public ActionResult Latest([FromBody]IList<HeaterData> heaterData)
+        public ActionResult Latest([FromBody]IList<HeaterValue> heaterValues)
         {
             this.logger.LogTrace("Latest called");
 
-            IDictionary<int, HeaterData> dataToSave = heaterData.ToDictionary((x) => x.ValueTypeId);
-
-            this.heaterRepository.SetHeaterValue(dataToSave);
+            this.heaterDataService.SetNewData(heaterValues);
 
             this.logger.LogTrace("Latest finished");
             return base.NoContent();

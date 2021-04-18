@@ -7,6 +7,8 @@ namespace Heizung.ServerDotNet.Service
     using System.Threading.Tasks;
     using Heizung.ServerDotNet.Data;
     using Heizung.ServerDotNet.Entities;
+    using Heizung.ServerDotNet.SignalRHubs;
+    using Microsoft.AspNetCore.SignalR;
     using Microsoft.Extensions.Logging;
 
     /// <summary>
@@ -50,6 +52,11 @@ namespace Heizung.ServerDotNet.Service
         /// Service für Lognachrichten
         /// </summary>
         private readonly ILogger logger;
+
+        /// <summary>
+        /// Hub zum senden von Nachrichten an Clients bezüglich den Heizungsdaten
+        /// </summary>
+        private readonly IHubContext<HeaterDataHub> heaterDataHub;
         #endregion
 
         #region events
@@ -72,10 +79,15 @@ namespace Heizung.ServerDotNet.Service
         /// </summary>
         /// <param name="logger">Service für Lognachrichten</param>
         /// <param name="heaterRepository">Repository für die Heizungsdaten</param>
-        public HeaterDataService(ILogger<HeaterDataService> logger, IHeaterRepository heaterRepository)
+        /// <param name="heaterDataHub">Hub zum senden von Nachrichten an Clients bezüglich den Heizungsdaten</param>
+        public HeaterDataService(
+            ILogger<HeaterDataService> logger, 
+            IHeaterRepository heaterRepository,
+            IHubContext<HeaterDataHub> heaterDataHub)
         {
             this.logger = logger;
             this.heaterRepository = heaterRepository;
+            this.heaterDataHub = heaterDataHub;
             this.destroyFunctions = new List<Action>();
             this.CurrentHeaterValues = new Dictionary<int, HeaterData>();
             this.doorOpeningsSinceFireOut = new List<DoorOpening>();
@@ -93,6 +105,7 @@ namespace Heizung.ServerDotNet.Service
                 return result;
             });
 
+            // Periodisches Speichern der Daten in der Datenbank machen
             var saveTimer = new Timer(
                 (timerState) => {
                     this.logger.LogDebug("HistoryDataTimer elapsed. Saving Historydata.");
@@ -106,7 +119,6 @@ namespace Heizung.ServerDotNet.Service
                 null, 
                 0, 
                 Convert.ToInt32(new TimeSpan(0, 15, 0).TotalMilliseconds));
-            
             this.destroyFunctions.Add(() => {
                 saveTimer.Dispose();
                 saveTimer = null;
@@ -141,7 +153,8 @@ namespace Heizung.ServerDotNet.Service
         /// wird das NewDataEvnet ausgelöst
         /// </summary>
         /// <param name="heaterValues">Die neuen Daten</param>
-        public async void SetNewData(IList<HeaterValue> heaterValues) {
+        public async void SetNewData(IList<HeaterValue> heaterValues) 
+        {
             this.logger.LogTrace("SetNewData started");
             this.updateSinceDBSave = true;
 
@@ -214,6 +227,18 @@ namespace Heizung.ServerDotNet.Service
 
                 if (this.CurrentHeaterValues.ContainsKey(newHeaterData.ValueTypeId) == false)
                 {
+                    this.CurrentHeaterValues.Add(newHeaterData.ValueTypeId, new HeaterData("", ""));
+                    
+                    if (heaterValuesDescriptionDictionary.ContainsKey(newHeaterData.ValueTypeId))
+                    {
+                        var valueDescription = heaterValuesDescriptionDictionary[newHeaterData.ValueTypeId];
+                        this.CurrentHeaterValues[newHeaterData.ValueTypeId].Description = valueDescription.Description;
+                        this.CurrentHeaterValues[newHeaterData.ValueTypeId].IsLogged = valueDescription.IsLogged;
+                        this.CurrentHeaterValues[newHeaterData.ValueTypeId].Unit = valueDescription.Unit ?? "";
+                        this.CurrentHeaterValues[newHeaterData.ValueTypeId].ValueTypeId = valueDescription.Id;
+                        this.CurrentHeaterValues[newHeaterData.ValueTypeId].Data.Add(new HeaterDataPoint(0));
+                    }
+
                     isNewData = true;
                 }
                 else if (this.CurrentHeaterValues[newHeaterData.ValueTypeId].Data[0].Value != newHeaterData.Data[0].Value)
@@ -304,10 +329,10 @@ namespace Heizung.ServerDotNet.Service
 
             if (this.CurrentHeaterValues[200].Data.Count == 0)
             {
-                this.CurrentHeaterValues[200].Data[0] = new HeaterDataPoint(0)
+                this.CurrentHeaterValues[200].Data.Add(new HeaterDataPoint(0)
                 {
                     TimeStamp = DateTime.Now
-                };
+                });
 
                 if (result == true)
                 {
@@ -343,6 +368,17 @@ namespace Heizung.ServerDotNet.Service
             }
 
             return result;
+        }
+        #endregion
+
+        #region SendCurrentHeaterDataToHubClients
+        /// <summary>
+        /// Sendet die aktuellen Heizungsdaten an alle Clients
+        /// </summary>
+        /// <returns></returns>
+        public async Task SendCurrentHeaterDataToHubClients(IDictionary<int, HeaterData> currentHeaterData)
+        {
+            await this.heaterDataHub.Clients.All.SendAsync("CurrentHeaterData", currentHeaterData);
         }
         #endregion
     }

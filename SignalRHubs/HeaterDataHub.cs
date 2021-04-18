@@ -10,14 +10,15 @@ namespace Heizung.ServerDotNet.SignalRHubs
     /// </summary>
     public class HeaterDataHub : Hub
     {        
-        #region SendCurrentHeaterData
+        #region TestEcho
         /// <summary>
-        /// Sendet die aktuellen Heizungsdaten an alle Clients
+        /// Sendet den angeben Text zurück.
         /// </summary>
-        /// <returns></returns>
-        protected async Task SendCurrentHeaterData(IDictionary<int, HeaterData> currentHeaterData)
+        /// <param name="echoText">Der Text, welcher zurück gesendet werden soll</param>
+        /// <returns>Gibt nichts zurück</returns>
+        private async Task TestEcho(string echoText)
         {
-            await Clients.All.SendAsync("CurrentHeaterData", currentHeaterData);
+            await this.Clients.Caller.SendAsync("Echo", echoText);
         }
         #endregion
     }

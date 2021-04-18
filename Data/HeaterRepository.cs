@@ -462,11 +462,11 @@ namespace Heizung.ServerDotNet.Data
                         var sqlStringBuilder = new StringBuilder(80);
                         sqlStringBuilder.Append("INSERT INTO Heizung.DataValues (ValueType, Value, Timestamp) VALUES ");
 
-                        for (var i = 0; i < heaterDataDictonary.Count; i++)
+                        foreach (var keyValuePair in heaterDataDictonary)
                         {
                             var isFirst = true;
 
-                            for (var j = 0; j < heaterDataDictonary[i].Data.Count; j++)
+                            for (var j = 0; j < heaterDataDictonary[keyValuePair.Key].Data.Count; j++)
                             {
                                 if (isFirst == true)
                                 {
@@ -477,10 +477,10 @@ namespace Heizung.ServerDotNet.Data
                                     sqlStringBuilder.Append(", ");
                                 }
 
-                                sqlStringBuilder.AppendFormat("@valueType{0}x{1}, @value{0}x{1}, @timestamp{0}x{1}", i, j);
-                                insertCommand.Parameters.AddWithValue($"@valueType{i}x{j}", heaterDataDictonary[i].ValueTypeId);
-                                insertCommand.Parameters.AddWithValue($"@value{i}x{j}", heaterDataDictonary[i].Data[j].Value);
-                                insertCommand.Parameters.AddWithValue($"@timestamp{i}x{j}", heaterDataDictonary[i].Data[j].TimeStamp);
+                                sqlStringBuilder.AppendFormat("@valueType{0}x{1}, @value{0}x{1}, @timestamp{0}x{1}", keyValuePair.Key, j);
+                                insertCommand.Parameters.AddWithValue($"@valueType{keyValuePair.Key}x{j}", heaterDataDictonary[keyValuePair.Key].ValueTypeId);
+                                insertCommand.Parameters.AddWithValue($"@value{keyValuePair.Key}x{j}", heaterDataDictonary[keyValuePair.Key].Data[j].Value);
+                                insertCommand.Parameters.AddWithValue($"@timestamp{keyValuePair.Key}x{j}", heaterDataDictonary[keyValuePair.Key].Data[j].TimeStamp);
                             }
                         }
 
