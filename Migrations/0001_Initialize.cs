@@ -13,7 +13,7 @@ namespace Heizung.ServerDotNet.Migrations
         /// Migriert zur nächsten Version
         /// </summary>
         public override void Up()
-        {            
+        {
             base.Create.Table("DataValues")
                         .WithDescription("Tabelle mit den Datenwerten, welche von der Heizung empfangen und gespeichert wurden.")
                         .WithColumn("Id")

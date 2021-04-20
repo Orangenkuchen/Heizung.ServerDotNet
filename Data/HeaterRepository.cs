@@ -8,6 +8,7 @@ namespace Heizung.ServerDotNet.Data
     using System.Threading.Tasks;
     using System.Linq;
     using System.Text;
+    using FluentMigrator.Runner;
 
     /// <summary>
     /// DataRepository für Datenbankanfragen bezüglich der Heizung
@@ -292,7 +293,6 @@ namespace Heizung.ServerDotNet.Data
         /// <exception type="Exception">Wird geworfen, wenn ein Datenbankfehler auftritt</exception>
         public void SetMailNotifierConfig(NotifierConfig notifierConfig)
         {
-
             List<string> valuesList = new List<string>();
             for (var i = 0; i < notifierConfig.MailConfigs.Count; i++)
             {
@@ -385,6 +385,50 @@ namespace Heizung.ServerDotNet.Data
                                 Id = (int)row.Id
                             });
                         }
+                    }
+                }
+                finally
+                {
+                    connection.Close();
+                }
+            }
+
+            return result;
+        }
+        #endregion
+
+        #region GetOperatingHoures
+        /// <summary>
+        /// Ermittelt eine Liste von täglichen Betriebsstunden im angegeben Zeitraum
+        /// </summary>
+        /// <param name="from">Von welchem Datum an geholt werden soll. (Nur Datum wird beachtet nicht Uhrzeit)</param>
+        /// <param name="to">Bis zu welchem Zeitpunkt geholt werden soll. (Nur Datum wird beachtet nicht Uhrzeit)</param>
+        /// <returns>Gibt die Liste der ermittelten Einträge zurück</returns>
+        public IList<DayOperatingHoures> GetOperatingHoures(DateTime from, DateTime to)
+        {
+            const string sql = "SELECT * FROM OperatingHoures WHERE `Timestamp` BETWEEN @FromDate AND @ToDate";
+            IList<DayOperatingHoures> result = new List<DayOperatingHoures>();
+
+            from = from.Date; // Anfang des Tags ermitteln
+            to = to.Date.AddDays(1).AddMilliseconds(-1); // Ende des Tags ermitteln
+
+            using (var connection = new MySqlConnection(this.connectionString))
+            {
+                try
+                {
+                    connection.Open();
+
+                    var rows = connection.Query(sql, new { FromDate= from, ToDate=to });
+
+                    foreach (var row in rows)
+                    {
+                        result.Add(new DayOperatingHoures()
+                        {
+                            Date = row.Timestamp.Date,
+                            MinHoures = Convert.ToUInt32(row.MinDay),
+                            MaxHoures = Convert.ToUInt32(row.MaxDay),
+                            Houres = Convert.ToUInt32(row.Amount)
+                        });
                     }
                 }
                 finally

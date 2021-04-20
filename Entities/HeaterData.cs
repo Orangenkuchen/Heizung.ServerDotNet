@@ -13,7 +13,7 @@ namespace Heizung.ServerDotNet.Entities
         /// </summary>
         /// <param name="description">Die Beschreibung der Heizungsdaten</param>
         /// <param name="unit"></param>
-        public HeaterData(string description, string unit)
+        public HeaterData(string description, string? unit)
         {
             this.Description = description;
             this.Unit = unit;
@@ -50,7 +50,7 @@ namespace Heizung.ServerDotNet.Entities
         /// Die Einheit des Werts
         /// </summary>
         /// <value></value>
-        public string Unit { get; set; }
+        public string? Unit { get; set; }
         #endregion
 
         #region Data

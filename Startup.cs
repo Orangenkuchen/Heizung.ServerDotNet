@@ -70,10 +70,10 @@ namespace Heizung.ServerDotNet
             services.AddFluentMigratorCore();
             services.ConfigureRunner(migrationRunnerBuilder => 
             {
-                migrationRunnerBuilder.AddSQLite();
-                migrationRunnerBuilder.WithGlobalConnectionString("Data Source=test.db");
-                //migrationRunnerBuilder.AddMySql5();
-                //migrationRunnerBuilder.WithGlobalConnectionString(this.Configuration.GetConnectionString("HeaterDatabase"));
+                //migrationRunnerBuilder.AddSQLite();
+                //migrationRunnerBuilder.WithGlobalConnectionString("Data Source=test.db");
+                migrationRunnerBuilder.AddMySql5();
+                migrationRunnerBuilder.WithGlobalConnectionString(this.Configuration.GetConnectionString("HeaterDatabase"));
                 migrationRunnerBuilder.ScanIn(typeof(Migrations._0000_Empty).Assembly).For.Migrations();
             });
 
@@ -104,16 +104,29 @@ namespace Heizung.ServerDotNet
         /// </summary>
         /// <param name="app">ApplicationBuilder</param>
         /// <param name="env">WebHostEnvironment</param>
-        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+        /// <param name="migrationRunner">Fluentdatamigration-Runner</param>
+        /// <param name="logger">Service für Lognachrichten</param>
+        public void Configure(
+            IApplicationBuilder app, 
+            IWebHostEnvironment env, 
+            IMigrationRunner migrationRunner,
+            ILogger<Startup> logger)
         {
+            logger.LogDebug("Configuration vom WebHost beginnt");
+
+            migrationRunner.MigrateUp();
+
             if (env.IsDevelopment())
             {
+                logger.LogDebug("Die Software wurde im 'Development'-Modus gestartet. Interne Serverfehler werden ausführlich dargestellt.");
                 app.UseDeveloperExceptionPage();
             }
             
+            logger.LogDebug("Konfiguriere Swagger und füge diesen zu den Endpunkten dazu");
             app.UseSwagger();
             app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Heizung.ServerDotNet v1"));
 
+            logger.LogDebug("Leitet HTTP-Anfragen auf HTTPS um");
             app.UseHttpsRedirection();
 
             app.UseRouting();
@@ -125,20 +138,29 @@ namespace Heizung.ServerDotNet
             app.UseCors(
                 builder => 
                 {
-                    builder.WithOrigins("http://localhost:4200", "http://***REMOVED***")
+                    var allowedOrigings = new string[] 
+                    {
+                        "http://localhost:4200", 
+                        "http://***REMOVED***" 
+                    };
+
+                    logger.LogDebug("Füge CORS für folgende Origins hinzu: {0}", allowedOrigings);
+                    builder.WithOrigins(allowedOrigings)
                            .AllowAnyMethod()
                            .AllowAnyHeader()
                            .AllowCredentials(); 
                 }
             );
 
+            logger.LogDebug("Füge API-Endpunkte hinzu");
             app.UseEndpoints(endpoints =>
             {
-                //var migrationRunner = endpoints.ServiceProvider.GetRequiredService<IMigrationRunner>();
-                //migrationRunner?.MigrateUp();
-
+                logger.LogDebug("Füge alle API-Controller vom Projekt zur API hinzu");
                 endpoints.MapControllers();
-                endpoints.MapHub<HeaterDataHub>("/HeaterDataHub");
+
+                var heaterDataHubAddress = "/HeaterDataHub";
+                logger.LogDebug("Füge den Hub {0} unter dem API-Punkt {1} hinzu", nameof(HeaterDataHub), heaterDataHubAddress);
+                endpoints.MapHub<HeaterDataHub>(heaterDataHubAddress);
 
                 var heaterDataHubContext = app.ApplicationServices.GetService<IHubContext<HeaterDataHub>>();
                 app.ApplicationServices.GetService<IHeaterDataService>().NewDataEvent += (currentHeaterDataDictionary) =>

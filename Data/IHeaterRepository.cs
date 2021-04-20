@@ -70,6 +70,16 @@ namespace Heizung.ServerDotNet.Data
         IDictionary<int, ErrorDescription> GetAllErrorDictionary();
         #endregion
 
+        #region GetOperatingHoures
+        /// <summary>
+        /// Ermittelt eine Liste von täglichen Betriebsstunden im angegeben Zeitraum
+        /// </summary>
+        /// <param name="from">Von welchem Datum an geholt werden soll. (Nur Datum wird beachtet nicht Uhrzeit)</param>
+        /// <param name="to">Bis zu welchem Zeitpunkt geholt werden soll. (Nur Datum wird beachtet nicht Uhrzeit)</param>
+        /// <returns>Gibt die Liste der ermittelten Einträge zurück</returns>
+        IList<DayOperatingHoures> GetOperatingHoures(DateTime from, DateTime to);
+        #endregion
+
         #region SetNewError
         /// <summary>
         /// Erzeugt einen neuen Eintrag in der FehlerTabelle

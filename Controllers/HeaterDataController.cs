@@ -61,7 +61,7 @@ namespace Heizung.ServerDotNet.Controllers
         [HttpGet]
         public ActionResult<IDictionary<int, HeaterData>> Data(DateTime fromDate, DateTime toDate)
         {
-            this.logger.LogTrace("Get called");
+            this.logger.LogTrace("Data: Get called");
             IDictionary<int, HeaterData> result = new Dictionary<int, HeaterData>();
 
             var valueDescriptions = this.heaterRepository.GetAllValueDescriptions();
@@ -112,7 +112,7 @@ namespace Heizung.ServerDotNet.Controllers
                 }
             }
 
-            this.logger.LogTrace("Get finished");
+            this.logger.LogTrace("Data: Get finished");
             return base.Ok(result);
         }
         #endregion
@@ -165,6 +165,24 @@ namespace Heizung.ServerDotNet.Controllers
 
             this.logger.LogTrace("Latest finished");
             return base.NoContent();
+        }
+        #endregion
+
+        #region OperatingHoures GET
+        /// <summary>
+        /// Ermittelt die Betriebsstunden im angegeben Zeitraum
+        /// </summary>
+        /// <param name="fromDate">Der Startzeitpunkt der Datenbeschaffung</param>
+        /// <param name="toDate">Der Endzeitpunkt der Datenbeschaffung</param>
+        /// <returns>Gibt die Daten als IList zurück</returns>
+        [HttpGet]
+        public ActionResult<IList<DayOperatingHoures>> OperatingHoures(DateTime fromDate, DateTime toDate)
+        {
+            this.logger.LogTrace("OperatingHoures: Get called");
+            IList<DayOperatingHoures> result = this.heaterRepository.GetOperatingHoures(fromDate, toDate);
+
+            this.logger.LogTrace("Get finished");
+            return base.Ok(result);
         }
         #endregion
 

@@ -39,3 +39,15 @@ CREATE TABLE `ValueDescription` (
   `IsLogged` bit(1) NOT NULL COMMENT 'Gibt an, ob dieser Wert in der Datenbank periodisch gespeichert werden soll.',
   UNIQUE KEY `ValueDescription_Id_IDX` (`Id`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='In dieser Tabelle werden die verschiedenen Typen von Wert, welche von der Heizung empfangen werden können, beschrieben. Hier wird auch festgelegt, welche davon in der Datenbank gepsichert werden.'
+
+CREATE TABLE `VersionInfo` (
+  `Version` bigint(20) NOT NULL,
+  `AppliedOn` datetime DEFAULT NULL,
+  `Description` varchar(1024) CHARACTER SET utf8 DEFAULT NULL,
+  UNIQUE KEY `UC_Version` (`Version`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+
+INSERT INTO Heizung.VersionInfo (Version,AppliedOn,Description)
+	VALUES (0,'2021-04-20 18:25:39.168','000_Empty');
+INSERT INTO Heizung.VersionInfo (Version,AppliedOn,Description)
+	VALUES (1,'2021-04-20 18:25:41.757','Legt die Grundstrucktur in der Datenbank an.');
