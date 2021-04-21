@@ -1,6 +1,7 @@
 namespace Heizung.ServerDotNet.Service
 {
     using System;
+    using System.Collections.Concurrent;
     using System.Collections.Generic;
     using System.Linq;
     using System.Threading;
@@ -93,7 +94,8 @@ namespace Heizung.ServerDotNet.Service
             this.doorOpeningsSinceFireOut = new List<DoorOpening>();
 
             this.heaterValueDescriptionDictionaryPromise = Task.Run<IDictionary<int, ValueDescription>>(() => {
-                IDictionary<int, ValueDescription> result = new Dictionary<int, ValueDescription>();
+                // Das ConcurrentDictionary ist hier notwendig, da ansonsten Exceptions auftreten können bei mehreren Threads
+                IDictionary<int, ValueDescription> result = new ConcurrentDictionary<int, ValueDescription>();
                 
                 var valueDescriptions = this.heaterRepository.GetAllValueDescriptions();
 
@@ -222,7 +224,13 @@ namespace Heizung.ServerDotNet.Service
                         isNewData = this.CeckForDoorOpening(newHeaterData.Data[0], heaterValuesDescriptionDictionary);
                     }
 
-                    newHeaterData.Data[0].Value = Convert.ToInt32(heaterValue.Value) / heaterValue.Multiplicator;
+                    if (heaterValue.Multiplicator == 0)
+                    {
+                        heaterValue.Multiplicator = 1;
+                    }
+
+                    this.logger.LogDebug("Berechnung: {0}, multiplicator: {1}", heaterValue.Value, heaterValue.Multiplicator);
+                    newHeaterData.Data[0].Value = Convert.ToDouble(heaterValue.Value) / heaterValue.Multiplicator;
                 }
 
                 if (this.CurrentHeaterValues.ContainsKey(newHeaterData.ValueTypeId) == false)
@@ -249,6 +257,7 @@ namespace Heizung.ServerDotNet.Service
                 if (isNewData)
                 {
                     this.CurrentHeaterValues[newHeaterData.ValueTypeId].Data[0].Value = newHeaterData.Data[0].Value;
+                    this.CurrentHeaterValues[newHeaterData.ValueTypeId].Data[0].TimeStamp = newHeaterData.Data[0].TimeStamp;
                     this.NewDataEvent?.Invoke(this.CurrentHeaterValues);
                 }
             }

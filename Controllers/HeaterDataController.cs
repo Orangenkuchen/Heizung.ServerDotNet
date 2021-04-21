@@ -159,7 +159,7 @@ namespace Heizung.ServerDotNet.Controllers
         [HttpPut]
         public ActionResult Latest([FromBody]IList<HeaterValue> heaterValues)
         {
-            this.logger.LogTrace("Latest called");
+            this.logger.LogTrace("Latest called PUT");
 
             this.heaterDataService.SetNewData(heaterValues);
 

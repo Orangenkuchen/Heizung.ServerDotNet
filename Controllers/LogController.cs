@@ -8,6 +8,28 @@ namespace Heizung.ServerDotNet.Controllers
     using Heizung.ServerDotNet.Service;
     using Microsoft.AspNetCore.Mvc;
     using Microsoft.Extensions.Logging;
+    using Serilog.Events;
+
+    /// <summary>
+    /// Enum für die Quelle vom Logging
+    /// </summary>
+    public enum LoggingSource
+    {
+        /// <summary>
+        /// Diese Quelle gilt für alle Lognarichten, welche nicht genau spezifiert werden
+        /// </summary>
+        General,
+
+        /// <summary>
+        /// Diese Quelle gilt für alle Lognarichten, welche von Microsoft kommen
+        /// </summary>
+        Microsoft,
+
+        /// <summary>
+        /// Diese Quelle gilt für alle Lognarichten, welche vom Client kommen
+        /// </summary>
+        Client
+    }
 
     /// <summary>
     /// Controller für die akutellen Heizungsdaten und die Historie
@@ -23,9 +45,14 @@ namespace Heizung.ServerDotNet.Controllers
         private readonly ILogger logger;
 
         /// <summary>
-        /// Der LogLevel von den Clientnachrichten, welche gespeichert werden
+        /// Service für Lognachrichten, welche vom Client stammen
         /// </summary>
-        private readonly ClientLogLevel minimumClientLogLevel;
+        private readonly Serilog.ILogger clientLogger;
+
+        /// <summary>
+        /// Klasse, welche entscheidet, was geloggt wird
+        /// </summary>
+        private readonly AppLoggingLevelSwitch appLoggingLevelSwitch;
         #endregion
 
         #region ctor
@@ -33,10 +60,16 @@ namespace Heizung.ServerDotNet.Controllers
         /// Initialisiert den Controller
         /// </summary>
         /// <param name="logger">Service für Lognachrichten</param>
-        public LogController(ILogger<HeaterDataController> logger)
+        /// <param name="appLoggingLevelSwitch">Klasse, welche entscheidet, was geloggt wird</param>
+        public LogController(
+            ILogger<HeaterDataController> logger,
+            AppLoggingLevelSwitch appLoggingLevelSwitch)
         {
             this.logger = logger;
-            this.minimumClientLogLevel = ClientLogLevel.Information;
+
+            // Wird gemacht, damit der Loglevel von den Client-Nachrichten sperat geschaltet werden kann
+            this.clientLogger = Serilog.Log.ForContext("SourceContext", "Client");
+            this.appLoggingLevelSwitch = appLoggingLevelSwitch;
         }
         #endregion
 
@@ -49,7 +82,34 @@ namespace Heizung.ServerDotNet.Controllers
         public ActionResult<ClientLogLevel> MinimumLevel()
         {
             this.logger.LogTrace("LogController: MinimumLevel called");
-            return base.Ok(this.minimumClientLogLevel);
+            return base.Ok(this.ConvertClientLogLevel(this.appLoggingLevelSwitch.ClientLoggingLevelSwitch.MinimumLevel));
+        }
+        #endregion
+
+        #region MinimumLevel PUT
+        /// <summary>
+        /// Setzt den MiniumLevel für Lognarchiten in der Kategorie
+        /// </summary>
+        /// <returns>Gibt nichts zurück</returns>
+        [HttpPut]
+        public ActionResult MinimumLevel(LoggingSource loggingSource, LogEventLevel newMiniumLevel)
+        {
+            this.logger.LogTrace("LogController: MinimumLevel PUT called");
+
+            switch(loggingSource)
+            {
+                case LoggingSource.General:
+                    this.appLoggingLevelSwitch.GerneralLoggingLevelSwitch.MinimumLevel = newMiniumLevel;
+                    break;
+                case LoggingSource.Microsoft:
+                    this.appLoggingLevelSwitch.MicrosoftLoggingLevelSwitch.MinimumLevel = newMiniumLevel;
+                    break;
+                case LoggingSource.Client:
+                    this.appLoggingLevelSwitch.ClientLoggingLevelSwitch.MinimumLevel = newMiniumLevel;
+                    break;
+            }
+
+            return base.NoContent();
         }
         #endregion
 
@@ -81,7 +141,7 @@ namespace Heizung.ServerDotNet.Controllers
             this.logger.LogTrace("LogController: Message called");
             var loglevelToLow = true;
 
-            if (clientLogLevel <= this.minimumClientLogLevel)
+            if (clientLogLevel <= this.ConvertClientLogLevel(this.appLoggingLevelSwitch.ClientLoggingLevelSwitch.MinimumLevel))
             {
                 IList<object> parametersObjectsList = new List<object>();
                 
@@ -106,7 +166,7 @@ namespace Heizung.ServerDotNet.Controllers
                     parametersObjectsList.Add(parameter);
                 }
 
-                this.logger.Log(msLogLevel, message, parametersObjectsList.ToArray());
+                this.clientLogger.Write(this.ConvertLogEventLevel(clientLogLevel), message, parametersObjectsList.ToArray());
             }
 
             this.logger.LogTrace("LogController: Message finished");
@@ -119,8 +179,8 @@ namespace Heizung.ServerDotNet.Controllers
             {
                 var error = new AddLogmessageApiError()
                 {
-                    Message = "LogMessage is higher than the minium Level",
-                    MinimumLogLevel = this.minimumClientLogLevel
+                    Message = "Level is lower than the minium Level",
+                    MinimumLogLevel = this.ConvertClientLogLevel(this.appLoggingLevelSwitch.ClientLoggingLevelSwitch.MinimumLevel)
                 };
                 return base.StatusCode(412, error);
             }
@@ -159,6 +219,84 @@ namespace Heizung.ServerDotNet.Controllers
                     break;
                 default:
                     result = LogLevel.None;
+                    break;
+            }
+
+            return result;
+        }
+        #endregion
+
+        #region ConvertClientLogLevel
+        /// <summary>
+        /// Konvertiert <see cref="LogEventLevel" /> zu <see cref="ClientLogLevel" />
+        /// </summary>
+        /// <param name="logEventLevel">Der Loglevel welche konvertiert werden soll</param>
+        /// <returns>Gibt den <see cref="LogLevel" /> zurück</returns>
+        private ClientLogLevel ConvertClientLogLevel(LogEventLevel logEventLevel)
+        {
+            ClientLogLevel result = ClientLogLevel.Off;
+
+            switch (logEventLevel)
+            {
+                case LogEventLevel.Fatal:
+                    result = ClientLogLevel.Fatal;
+                    break;
+                case LogEventLevel.Error:
+                    result = ClientLogLevel.Error;
+                    break;
+                case LogEventLevel.Warning:
+                    result = ClientLogLevel.Warning;
+                    break;
+                case LogEventLevel.Information:
+                    result = ClientLogLevel.Information;
+                    break;
+                case LogEventLevel.Debug:
+                    result = ClientLogLevel.Debug;
+                    break;
+                case LogEventLevel.Verbose:
+                    result = ClientLogLevel.Verbose;
+                    break;
+                default:
+                    result = ClientLogLevel.Off;
+                    break;
+            }
+
+            return result;
+        }
+        #endregion
+
+        #region ConvertLogEventLevel
+        /// <summary>
+        /// Konvertiert <see cref="ClientLogLevel" /> zu <see cref="LogEventLevel" />
+        /// </summary>
+        /// <param name="clientLogLevel">Der Loglevel welche konvertiert werden soll</param>
+        /// <returns>Gibt den <see cref="LogEventLevel" /> zurück</returns>
+        private LogEventLevel ConvertLogEventLevel(ClientLogLevel clientLogLevel)
+        {
+            LogEventLevel result = LogEventLevel.Verbose;
+
+            switch (clientLogLevel)
+            {
+                case ClientLogLevel.Fatal:
+                    result = LogEventLevel.Fatal;
+                    break;
+                case ClientLogLevel.Error:
+                    result = LogEventLevel.Error;
+                    break;
+                case ClientLogLevel.Warning:
+                    result = LogEventLevel.Warning;
+                    break;
+                case ClientLogLevel.Information:
+                    result = LogEventLevel.Information;
+                    break;
+                case ClientLogLevel.Debug:
+                    result = LogEventLevel.Debug;
+                    break;
+                case ClientLogLevel.Verbose:
+                    result = LogEventLevel.Verbose;
+                    break;
+                default:
+                    result = LogEventLevel.Verbose;
                     break;
             }
 

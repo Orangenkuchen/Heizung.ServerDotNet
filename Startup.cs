@@ -24,6 +24,7 @@ namespace Heizung.ServerDotNet
     using MySqlConnector;
     using FluentMigrator.Runner;
     using FluentMigrator.Runner.Initialization;
+    using Newtonsoft.Json.Converters;
 
     /// <summary>
     /// Diese Klasse wird beim Starten des Webservers aufgerufen und konfiguriert diesen
@@ -82,9 +83,14 @@ namespace Heizung.ServerDotNet
 
             services.AddCors();
 
-            services.AddControllers();
+            services.AddControllers()
+                    .AddNewtonsoftJson(options => 
+                    {
+                        options.SerializerSettings.Converters.Add(new StringEnumConverter());
+                    });
             services.AddSignalR();
-
+            
+            services.AddSwaggerGenNewtonsoftSupport();
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "Heizung.ServerDotNet", Version = "v1", });
@@ -124,7 +130,10 @@ namespace Heizung.ServerDotNet
             
             logger.LogDebug("Konfiguriere Swagger und füge diesen zu den Endpunkten dazu");
             app.UseSwagger();
-            app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Heizung.ServerDotNet v1"));
+            app.UseSwaggerUI(c => 
+            {
+                c.SwaggerEndpoint("/swagger/v1/swagger.json", "Heizung.ServerDotNet v1");
+            });
 
             logger.LogDebug("Leitet HTTP-Anfragen auf HTTPS um");
             app.UseHttpsRedirection();
