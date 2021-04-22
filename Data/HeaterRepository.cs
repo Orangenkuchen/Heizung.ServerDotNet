@@ -526,7 +526,7 @@ namespace Heizung.ServerDotNet.Data
                                     sqlStringBuilder.AppendFormat("(@valueType{0}x{1}, @value{0}x{1}, @timestamp{0}x{1})", keyValuePair.Key, j);
                                     insertCommand.Parameters.AddWithValue($"@valueType{keyValuePair.Key}x{j}", heaterDataDictonary[keyValuePair.Key].ValueTypeId);
                                     insertCommand.Parameters.AddWithValue($"@value{keyValuePair.Key}x{j}", heaterDataDictonary[keyValuePair.Key].Data[j].Value);
-                                    insertCommand.Parameters.AddWithValue($"@timestamp{keyValuePair.Key}x{j}", heaterDataDictonary[keyValuePair.Key].Data[j].TimeStamp);
+                                    insertCommand.Parameters.AddWithValue($"@timestamp{keyValuePair.Key}x{j}", DateTime.Now);
                                 }
                             }
                         }
