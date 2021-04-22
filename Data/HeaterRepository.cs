@@ -506,25 +506,28 @@ namespace Heizung.ServerDotNet.Data
                         var sqlStringBuilder = new StringBuilder(80);
                         sqlStringBuilder.Append("INSERT INTO Heizung.DataValues (ValueType, Value, Timestamp) VALUES ");
 
+                        var isFirst = true;
+
                         foreach (var keyValuePair in heaterDataDictonary)
                         {
-                            var isFirst = true;
-
                             for (var j = 0; j < heaterDataDictonary[keyValuePair.Key].Data.Count; j++)
                             {
-                                if (isFirst == true)
+                                if (heaterDataDictonary[keyValuePair.Key].Data[j].TimeStamp > new DateTime(2000, 1, 1))
                                 {
-                                    isFirst = false;
-                                }
-                                else
-                                {
-                                    sqlStringBuilder.Append(", ");
-                                }
+                                    if (isFirst == true)
+                                    {
+                                        isFirst = false;
+                                    }
+                                    else
+                                    {
+                                        sqlStringBuilder.Append(", ");
+                                    }
 
-                                sqlStringBuilder.AppendFormat("@valueType{0}x{1}, @value{0}x{1}, @timestamp{0}x{1}", keyValuePair.Key, j);
-                                insertCommand.Parameters.AddWithValue($"@valueType{keyValuePair.Key}x{j}", heaterDataDictonary[keyValuePair.Key].ValueTypeId);
-                                insertCommand.Parameters.AddWithValue($"@value{keyValuePair.Key}x{j}", heaterDataDictonary[keyValuePair.Key].Data[j].Value);
-                                insertCommand.Parameters.AddWithValue($"@timestamp{keyValuePair.Key}x{j}", heaterDataDictonary[keyValuePair.Key].Data[j].TimeStamp);
+                                    sqlStringBuilder.AppendFormat("(@valueType{0}x{1}, @value{0}x{1}, @timestamp{0}x{1})", keyValuePair.Key, j);
+                                    insertCommand.Parameters.AddWithValue($"@valueType{keyValuePair.Key}x{j}", heaterDataDictonary[keyValuePair.Key].ValueTypeId);
+                                    insertCommand.Parameters.AddWithValue($"@value{keyValuePair.Key}x{j}", heaterDataDictonary[keyValuePair.Key].Data[j].Value);
+                                    insertCommand.Parameters.AddWithValue($"@timestamp{keyValuePair.Key}x{j}", heaterDataDictonary[keyValuePair.Key].Data[j].TimeStamp);
+                                }
                             }
                         }
 
@@ -532,7 +535,7 @@ namespace Heizung.ServerDotNet.Data
                         insertCommand.ExecuteNonQuery();
                     }
 
-                    connection.Execute($"INSERT INTO Heizung.DataValues (ValueType, Value, Timestamp) VALUES {string.Join(", ", insertValues)}");
+                    //connection.Execute($"INSERT INTO Heizung.DataValues (ValueType, Value, Timestamp) VALUES {string.Join(", ", insertValues)}");
                 }
                 finally
                 {

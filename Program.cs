@@ -29,9 +29,31 @@ namespace Heizung.ServerDotNet
         /// Die Funktion welcher beim Programmstart aufgerufen wird
         /// </summary>
         /// <param name="args">Die Argumente welche an das Programm gegeben werden</param>
-        public static void Main(string[] args)
+        public static int Main(string[] args)
         {
             var argsList = new List<string>(args);
+
+            if (argsList.Contains("-h") || argsList.Contains("--help"))
+            {
+                Console.WriteLine("Hilfe:");
+                Console.WriteLine("========================");
+                Console.WriteLine("-h oder --help > Zeigt diese Hilfe an");
+                Console.WriteLine("--service-install-help > Zeigt einen Hilfetext an, wie man die Anwendung als Servcie installiert");
+
+                return 1;
+            } 
+            else if (argsList.Contains("--service-install-help"))
+            {
+                var executablePath = AppDomain.CurrentDomain.BaseDirectory;
+                var serviceHelpText = File.ReadAllText(Path.Combine(executablePath, "HotToInstallAsService.txt"));
+                Console.WriteLine(serviceHelpText);
+
+                return 2;
+            }
+            else
+            {
+                Console.WriteLine("Hilfe > -h");
+            }
 
             var logfilePath = System.IO.Path.Combine(
                 System.Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), 
@@ -65,6 +87,8 @@ namespace Heizung.ServerDotNet
             {
                 Log.CloseAndFlush();
             }
+
+            return 0;
         }
         #endregion
 

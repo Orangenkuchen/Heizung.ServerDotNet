@@ -26,10 +26,9 @@
     <Content Include="Migrations\SqlScripts\*.*">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <Content Include="LinuxServiceTemplate.service">
+    <Content Include="HotToInstallAsService.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <PackageReference Include="Swashbuckle.AspNetCore.Newtonsoft" Version="6.1.3" />  
   </ItemGroup>
-
 </Project>

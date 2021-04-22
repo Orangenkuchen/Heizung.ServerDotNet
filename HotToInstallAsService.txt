@@ -1,0 +1,33 @@
+Installieren vom Server als Service
+=========================================
+
+*** Windows ***
+In Powershell folgenden Befehl eingeben:
+
+> New-Service -Name "heizung-server-service" -BinaryPathName "{EXE FILE PATH}" -Credential "{DOMAIN OR COMPUTER NAME\USER}" -Description "Service zum bereitstellen von den Heizungsdaten aus der Datenbank" -DisplayName "Heizungsserver" -StartupType Automatic
+
+*** Linux ***
+Im Ordner "/etc/systemd/system/" eine Datei mit dem Namen "heizung-server.service" erstellen und den folgenden Text einfügen:
+
+> [Unit]
+> Description=Service zum bereitstellen von den Heizungsdaten aus der Datenbank
+> 
+> [Service]
+> ExecStart={PathToExecutable}
+> WorkingDirectory={PathToWorkingDirectory}
+> User={UserName}
+> Group={GroupName}
+> Restart=on-failure
+> SyslogIdentifier=heizung-server-service
+> PrivateTmp=true
+> 
+> [Install]
+> WantedBy=multi-user.target
+> 
+
+anschließend den service installieren mit
+> sudo systemctl enable heizung-server
+danach kann der service gestartet werden
+> sudo service heizung-server start
+der service kann mit den folgenden Befehl deinstalliert werden
+> sudo systemctl disable heizung-server

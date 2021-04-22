@@ -106,6 +106,10 @@ namespace Heizung.ServerDotNet.Service
                 
                 return result;
             });
+            this.heaterValueDescriptionDictionaryPromise.ContinueWith((task) =>
+            {
+                this.FillHeaterDataDictionaryByValueDescription(this.CurrentHeaterValues, task.Result);
+            });
 
             // Periodisches Speichern der Daten in der Datenbank machen
             var saveTimer = new Timer(
@@ -127,7 +131,7 @@ namespace Heizung.ServerDotNet.Service
             });
 
             this.errorDictionaryPromise = Task.Run(() => {
-                IDictionary<int, ErrorDescription> result = this.heaterRepository.GetAllErrorDictionary();
+                IDictionary<int, ErrorDescription> result = new ConcurrentDictionary<int, ErrorDescription>(this.heaterRepository.GetAllErrorDictionary());
 
                 return result;
             });
@@ -229,27 +233,10 @@ namespace Heizung.ServerDotNet.Service
                         heaterValue.Multiplicator = 1;
                     }
 
-                    this.logger.LogDebug("Berechnung: {0}, multiplicator: {1}", heaterValue.Value, heaterValue.Multiplicator);
                     newHeaterData.Data[0].Value = Convert.ToDouble(heaterValue.Value) / heaterValue.Multiplicator;
                 }
 
-                if (this.CurrentHeaterValues.ContainsKey(newHeaterData.ValueTypeId) == false)
-                {
-                    this.CurrentHeaterValues.Add(newHeaterData.ValueTypeId, new HeaterData("", ""));
-                    
-                    if (heaterValuesDescriptionDictionary.ContainsKey(newHeaterData.ValueTypeId))
-                    {
-                        var valueDescription = heaterValuesDescriptionDictionary[newHeaterData.ValueTypeId];
-                        this.CurrentHeaterValues[newHeaterData.ValueTypeId].Description = valueDescription.Description;
-                        this.CurrentHeaterValues[newHeaterData.ValueTypeId].IsLogged = valueDescription.IsLogged;
-                        this.CurrentHeaterValues[newHeaterData.ValueTypeId].Unit = valueDescription.Unit ?? "";
-                        this.CurrentHeaterValues[newHeaterData.ValueTypeId].ValueTypeId = valueDescription.Id;
-                        this.CurrentHeaterValues[newHeaterData.ValueTypeId].Data.Add(new HeaterDataPoint(0));
-                    }
-
-                    isNewData = true;
-                }
-                else if (this.CurrentHeaterValues[newHeaterData.ValueTypeId].Data[0].Value != newHeaterData.Data[0].Value)
+                if (this.CurrentHeaterValues[newHeaterData.ValueTypeId].Data[0].Value != newHeaterData.Data[0].Value)
                 {
                     isNewData = true;
                 }
@@ -388,6 +375,35 @@ namespace Heizung.ServerDotNet.Service
         public async Task SendCurrentHeaterDataToHubClients(IDictionary<int, HeaterData> currentHeaterData)
         {
             await this.heaterDataHub.Clients.All.SendAsync("CurrentHeaterData", currentHeaterData);
+        }
+        #endregion
+
+        #region FillHeaterDataDictionaryByValueDescription
+        /// <summary>
+        /// Füllt das HeaterdataDictionary ahand vom ValueDescriptionDictionary
+        /// </summary>
+        /// <param name="heaterDataDictionary">Das Dictionary, welches gefüllt werden soll</param>
+        /// <param name="valueDescriptionDictionary">Das Dictionary, welche zum füllen verwendet werden soll</param>
+        private void FillHeaterDataDictionaryByValueDescription(
+            IDictionary<int, HeaterData> heaterDataDictionary,
+            IDictionary<int, ValueDescription> valueDescriptionDictionary)
+        {
+            foreach (var valueDescription in valueDescriptionDictionary)
+            {
+                if (this.CurrentHeaterValues.ContainsKey(valueDescription.Key) == false)
+                {
+                    this.CurrentHeaterValues.Add(
+                        valueDescription.Key, 
+                        new HeaterData(
+                            valueDescription.Value.Description, 
+                            valueDescription.Value.Unit)
+                        {
+                            ValueTypeId = valueDescription.Value.Id,
+                            IsLogged = valueDescription.Value.IsLogged
+                        });
+                    this.CurrentHeaterValues[valueDescription.Key].Data.Add(new HeaterDataPoint(0));
+                }
+            }
         }
         #endregion
     }
