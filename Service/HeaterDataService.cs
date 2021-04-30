@@ -191,7 +191,7 @@ namespace Heizung.ServerDotNet.Service
                     newHeaterData.IsLogged = heaterValuesDescriptionDictionary[newHeaterData.ValueTypeId].IsLogged;
                 }
 
-                // Wenn Heizungsstatus
+                // Wenn Fehler
                 if (newHeaterData.ValueTypeId == 99)
                 {
                     int? errorId = null;
@@ -223,11 +223,6 @@ namespace Heizung.ServerDotNet.Service
                 }
                 else
                 {
-                    if (newHeaterData.ValueTypeId == 1)
-                    {
-                        isNewData = this.CeckForDoorOpening(newHeaterData.Data[0], heaterValuesDescriptionDictionary);
-                    }
-
                     if (heaterValue.Multiplicator == 0)
                     {
                         heaterValue.Multiplicator = 1;
@@ -243,6 +238,11 @@ namespace Heizung.ServerDotNet.Service
 
                 if (isNewData)
                 {
+                    if (newHeaterData.ValueTypeId == 1)
+                    {
+                        isNewData = this.CeckForDoorOpening(newHeaterData.Data[0], heaterValuesDescriptionDictionary);
+                    }
+
                     this.CurrentHeaterValues[newHeaterData.ValueTypeId].Data[0].Value = newHeaterData.Data[0].Value;
                     this.CurrentHeaterValues[newHeaterData.ValueTypeId].Data[0].TimeStamp = newHeaterData.Data[0].TimeStamp;
                     this.NewDataEvent?.Invoke(this.CurrentHeaterValues);
@@ -264,11 +264,14 @@ namespace Heizung.ServerDotNet.Service
             HeaterDataPoint statusDataPoint, 
             IDictionary<int, ValueDescription> heaterValuesDescriptionDictionary)
         {
+            this.logger.LogDebug("CeckForDoorOpening: Cecking for DoorOpenings and calculating Time");
+
             var result = false;
-            var statusValue = (int)statusDataPoint.Value;
+            var statusValue = Convert.ToInt32(statusDataPoint.Value);
 
             if (this.CurrentHeaterValues.ContainsKey(200) == false)
             {
+                this.logger.LogTrace("CeckForDoorOpening: CurrentHeaterValues does not contain DoorOpenings. Adding empty Object for DoorOpeings at Key 200");
                 var doorOpeningsValueDescription = heaterValuesDescriptionDictionary[200];
 
                 this.CurrentHeaterValues[200] = new HeaterData(doorOpeningsValueDescription.Description, doorOpeningsValueDescription.Unit)
@@ -283,18 +286,28 @@ namespace Heizung.ServerDotNet.Service
                 statusValue == 56) &&
                 this.doorOpeningsSinceFireOut.Count > 0)
             {
+                this.logger.LogTrace(
+                    "CeckForDoorOpening: State after door closing was detected ({0}).", 
+                    statusValue);
                 var lastDoorOpenings = this.doorOpeningsSinceFireOut.Last();
 
                 if (lastDoorOpenings.EndDateTime == null)
                 {
+                    this.logger.LogTrace("CheckForDoorOpening: Door closing was not jet detected. Setting Endtime of latest door opening in Dictionary.");
                     lastDoorOpenings.EndDateTime = DateTime.Now;
                     result = true;
+                }
+                else
+                {
+                    this.logger.LogTrace("CheckForDoorOpening: Door closing was already detected.");
                 }
             }
             else if (statusValue == 2 ||
                      statusValue == 3 ||
                      statusValue == 4)
             {
+                this.logger.LogTrace("CheckForDoorOpening: Detected burning state or fire starting state. Clearing door openings.");
+
                 if (this.doorOpeningsSinceFireOut.Count > 0)
                 {
                     this.doorOpeningsSinceFireOut.Clear();
@@ -303,6 +316,8 @@ namespace Heizung.ServerDotNet.Service
             }
             else if (statusValue == 6)
             {
+                this.logger.LogTrace("CheckForDoorOpening: Detected door open state. Cecking if this door opening is already registered.");
+
                 result = true;
                 var doorOpeningAlreadyRegistered = false;
 
@@ -315,11 +330,17 @@ namespace Heizung.ServerDotNet.Service
 
                 if (doorOpeningAlreadyRegistered == false)
                 {
+                    this.logger.LogTrace("CheckForDoorOpening: Door opening was not jet detected. Registering in Dictionary.");
+
                     this.doorOpeningsSinceFireOut.Add(new DoorOpening()
                     {
                         StartDateTime = DateTime.Now,
                         EndDateTime = null
                     });
+                }
+                else
+                {
+                    this.logger.LogTrace("CheckForDoorOpening: Door opening is already registered.");
                 }
             }
 
@@ -329,14 +350,16 @@ namespace Heizung.ServerDotNet.Service
                 {
                     TimeStamp = DateTime.Now
                 });
-
-                if (result == true)
-                {
-                    this.CurrentHeaterValues[200].Data[0].Value = this.GetSumOfDoorOpenings(this.doorOpeningsSinceFireOut);
-                    this.CurrentHeaterValues[200].Data[0].TimeStamp = DateTime.Now;
-                }
             }
 
+            if (result == true)
+            {
+                this.logger.LogTrace("CheckForDoorOpening: Door opening timespan has changed. Recalculating. Setting result in CurrentHeaterValues.");
+
+                this.CurrentHeaterValues[200].Data[0].Value = this.GetSumOfDoorOpenings(this.doorOpeningsSinceFireOut);
+                this.CurrentHeaterValues[200].Data[0].TimeStamp = DateTime.Now;
+            }
+            
             return result;
         }
         #endregion
