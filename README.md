@@ -23,8 +23,8 @@ Die Software kann Mail versenden in folgenden Fällen:
 ## Logging
 
 Die Anwendung loggt in den folgenden Pfaden:
-* Windows > C:\Documents and Settings\<User>\Application Data\Heizung.ServerDotNet\Log.txt
-* Linux > /home/<User>/.config/Heizung.ServerDotNet/Log.txt
+* Windows > C:\Documents and Settings\\{User}\Application Data\Heizung.ServerDotNet\Log.txt
+* Linux > /home/{User}/.config/Heizung.ServerDotNet/Log.txt
 
 Der Level vom Logging kann über die WebApi geändert werden.
 
