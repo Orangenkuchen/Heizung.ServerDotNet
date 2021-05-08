@@ -460,8 +460,8 @@ namespace Heizung.ServerDotNet.Data
 
                     var transaction = connection.BeginTransaction();
 
-                    connection.Execute($"INSERT INTO 'ErrorList' (Description) VALUE (@errorText)", param: new { errorText = errorText}, transaction: transaction);
-                    result = connection.QuerySingle<int>("Select LAST_INSERT_ID()", transaction);
+                    connection.Execute($"INSERT INTO ErrorList (Description) VALUE (@errorText)", param: new { errorText = errorText}, transaction: transaction);
+                    result = connection.QuerySingle<int>("Select LAST_INSERT_ID()", transaction: transaction);
 
                     transaction.Commit();
                 }
