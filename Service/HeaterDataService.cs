@@ -210,7 +210,7 @@ namespace Heizung.ServerDotNet.Service
                     {
                         errorId = this.heaterRepository.SetNewError(errorValue);
 
-                        if (errorDictionary.ContainsKey(errorId.Value))
+                        if (errorDictionary.ContainsKey(errorId.Value) == false)
                         {
                             errorDictionary.Add(errorId.Value, new ErrorDescription(errorValue)
                             {
