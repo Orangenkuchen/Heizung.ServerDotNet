@@ -147,14 +147,13 @@ namespace Heizung.ServerDotNet
             app.UseCors(
                 builder => 
                 {
-                    var allowedOrigings = new string[] 
-                    {
-                        "http://localhost:4200", 
-                        "http://***REMOVED***" 
-                    };
+                    var allowedOrigins = this.Configuration.GetSection("AllowedCorsOrigins")
+                                                            .GetChildren()
+                                                            .Select((x) => x.Value)
+                                                            .ToArray();
 
-                    logger.LogDebug("Füge CORS für folgende Origins hinzu: {0}", allowedOrigings);
-                    builder.WithOrigins(allowedOrigings)
+                    logger.LogDebug("Füge CORS für folgende Origins hinzu: {0}", allowedOrigins);
+                    builder.WithOrigins(allowedOrigins)
                            .AllowAnyMethod()
                            .AllowAnyHeader()
                            .AllowCredentials(); 
