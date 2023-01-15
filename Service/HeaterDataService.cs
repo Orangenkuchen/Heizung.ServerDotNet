@@ -228,7 +228,16 @@ namespace Heizung.ServerDotNet.Service
                         heaterValue.Multiplicator = 1;
                     }
 
-                    newHeaterData.Data[0].Value = Convert.ToDouble(heaterValue.Value) / heaterValue.Multiplicator;
+                    newHeaterData.Data[0].Value = 0;
+
+                    try
+                    {
+                        newHeaterData.Data[0].Value = Convert.ToDouble(heaterValue.Value) / heaterValue.Multiplicator;
+                    }
+                    catch(Exception exception)
+                    {
+                        this.logger.LogError(exception, "Fehler beim Konvertieren vom Wert \"{0}\"", heaterValue.Value);
+                    }
                 }
 
                 if (this.CurrentHeaterValues[newHeaterData.ValueTypeId].Data[0].Value != newHeaterData.Data[0].Value)

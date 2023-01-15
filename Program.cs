@@ -58,7 +58,9 @@ namespace Heizung.ServerDotNet
             var logfilePath = System.IO.Path.Combine(
                 System.Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), 
                 System.Reflection.Assembly.GetExecutingAssembly().GetName().Name ?? "", 
-                "Log.txt");
+                "Log.log");
+
+            Console.WriteLine(logfilePath);
 
             var appLoggingLevelSwitch = new AppLoggingLevelSwitch();
 
@@ -68,7 +70,7 @@ namespace Heizung.ServerDotNet
                 .MinimumLevel.Override("Microsoft", appLoggingLevelSwitch.MicrosoftLoggingLevelSwitch)
                 .Enrich.FromLogContext()
                 .WriteTo.Console()
-                .WriteTo.File(logfilePath, fileSizeLimitBytes: 10 * 1024 * 1024)
+                .WriteTo.File(logfilePath, fileSizeLimitBytes: 10 * 1024 * 1024, rollingInterval: RollingInterval.Day)
                 .CreateLogger();
 
             AppDomain currentDomain = AppDomain.CurrentDomain;

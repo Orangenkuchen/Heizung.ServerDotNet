@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": ".NET 5",
+            "name": ".NET 7",
             "type": "coreclr",
             "request": "launch",
             "WARNING01": "*********************************************************************************",
@@ -26,17 +26,24 @@
             "WARNING16": "button at the bottom of this file.",
             "WARNING17": "*********************************************************************************",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/bin/Debug/net5.0/Heizung.ServerDotNet.dll",
+            "program": "${workspaceFolder}/bin/Debug/net6.0/Heizung.ServerDotNet.dll",
             "args": [],
             "cwd": "${workspaceFolder}",
             "console": "internalConsole",
             "stopAtEntry": false
         },
         {
-            "name": ".NET 5 Attach",
+            "name": ".NET 7 Attach",
             "type": "coreclr",
             "request": "attach",
             "processId": "${command:pickProcess}"
+        },
+        {
+            "name": "Transfer Data",
+            "type": "PowerShell",
+            "request": "launch",
+            "script": "${workspaceFolder}/Transfer.ps1",
+            "cwd": "${cwd}"
         }
     ]
 }
