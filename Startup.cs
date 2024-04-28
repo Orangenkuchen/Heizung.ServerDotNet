@@ -78,7 +78,11 @@ namespace Heizung.ServerDotNet
                 migrationRunnerBuilder.ScanIn(typeof(Migrations._0000_Empty).Assembly).For.Migrations();
             });
 
-            services.AddSingleton<IHeaterRepository>(new HeaterRepository(this.Configuration.GetConnectionString("HeaterDatabase")));
+            services.AddSingleton<IHeaterRepository>(
+                (serviceProvider) => {
+                    return new HeaterRepository(this.Configuration.GetConnectionString("HeaterDatabase")!, serviceProvider.GetService<ILogger>()!);
+                }
+            );
             services.AddSingleton<IHeaterDataService, HeaterDataService>();
 
             services.AddCors();

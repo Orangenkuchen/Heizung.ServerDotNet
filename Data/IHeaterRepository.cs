@@ -94,10 +94,10 @@ namespace Heizung.ServerDotNet.Data
         /// <summary>
         /// Fügt neue Heizwerte in die Tabelle hinzu
         /// </summary>
-        /// <param name="heaterDataDictonary">Dictionary mit den Werten, welche hinzugefügt werden sollen</param>
+        /// <param name="heaterDataList">List von Werten, welche gespeichert werden sollen</param>
         /// <exception type="Exception">Wird geworfen, wenn ein Datenbankfehler auftritt</exception>
         /// <returns>Gibt die Id von dem neuen Eintrag zurück</returns>
-        void SetHeaterValue(IDictionary<int, HeaterData> heaterDataDictonary);
+        public void SetHeaterValue(IEnumerable<HeaterData> heaterDataList);
         #endregion
     }
 }

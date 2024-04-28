@@ -9,6 +9,7 @@ namespace Heizung.ServerDotNet.Data
     using System.Linq;
     using System.Text;
     using FluentMigrator.Runner;
+    using Microsoft.Extensions.Logging;
 
     /// <summary>
     /// DataRepository für Datenbankanfragen bezüglich der Heizung
@@ -27,6 +28,11 @@ namespace Heizung.ServerDotNet.Data
         /// Der Verbindungsstring zur Datenbank
         /// </summary>
         private readonly string connectionString;
+
+        /// <summary>
+        /// Service zum Loggen von Nachrichten.
+        /// </summary>
+        private readonly ILogger logger;
         #endregion
 
         #region ctor
@@ -34,9 +40,11 @@ namespace Heizung.ServerDotNet.Data
         /// Initialisiert die Klasse und fügt die Datenbankverbindung hinzu
         /// </summary>
         /// <param name="connectionString">Der Verbindungsstring zur Datenbank</param>
-        public HeaterRepository(string connectionString)
+        /// <param name="logger">Service zum Loggen von Nachrichten.</param>
+        public HeaterRepository(string connectionString, ILogger logger)
         {
             this.connectionString = connectionString;
+            this.logger = logger;
         }
         #endregion
 
@@ -476,25 +484,9 @@ namespace Heizung.ServerDotNet.Data
         #endregion
 
         #region SetHeaterValue
-        /// <summary>
-        /// Fügt neue Heizwerte in die Tabelle hinzu
-        /// </summary>
-        /// <param name="heaterDataDictonary">Dictionary mit den Werten, welche hinzugefügt werden sollen</param>
-        /// <exception type="Exception">Wird geworfen, wenn ein Datenbankfehler auftritt</exception>
-        /// <returns>Gibt die Id von dem neuen Eintrag zurück</returns>
-        public void SetHeaterValue(IDictionary<int, HeaterData> heaterDataDictonary)
+        /// <inheritdoc cref="IHeaterRepository.SetHeaterValue(IEnumerable{HeaterData})" />
+        public void SetHeaterValue(IEnumerable<HeaterData> heaterDataList)
         {
-            IList<string> insertValues = new List<string>();
-            var currentDate = DateTime.Now;
-
-            foreach (var heaterData in heaterDataDictonary)
-            {
-                foreach (var dataPoint in heaterData.Value.Data)
-                {
-                   insertValues.Add($"({heaterData.Value.ValueTypeId}, {dataPoint.Value}, {dataPoint.TimeStamp.ToString(databaseDateTimeFormatString)})");
-                }
-            }
-
             using (var connection = new MySqlConnection(this.connectionString))
             {
                 try
@@ -508,11 +500,11 @@ namespace Heizung.ServerDotNet.Data
 
                         var isFirst = true;
 
-                        foreach (var keyValuePair in heaterDataDictonary)
+                        foreach (var element in heaterDataList)
                         {
-                            for (var j = 0; j < heaterDataDictonary[keyValuePair.Key].Data.Count; j++)
+                            for (var j = 0; j < element.Data.Count; j++)
                             {
-                                if (heaterDataDictonary[keyValuePair.Key].Data[j].TimeStamp > new DateTime(2000, 1, 1))
+                                if (element.Data[j].TimeStamp > new DateTime(2000, 1, 1))
                                 {
                                     if (isFirst == true)
                                     {
@@ -523,19 +515,22 @@ namespace Heizung.ServerDotNet.Data
                                         sqlStringBuilder.Append(", ");
                                     }
 
-                                    sqlStringBuilder.AppendFormat("(@valueType{0}x{1}, @value{0}x{1}, @timestamp{0}x{1})", keyValuePair.Key, j);
-                                    insertCommand.Parameters.AddWithValue($"@valueType{keyValuePair.Key}x{j}", heaterDataDictonary[keyValuePair.Key].ValueTypeId);
-                                    insertCommand.Parameters.AddWithValue($"@value{keyValuePair.Key}x{j}", heaterDataDictonary[keyValuePair.Key].Data[j].Value);
-                                    insertCommand.Parameters.AddWithValue($"@timestamp{keyValuePair.Key}x{j}", DateTime.Now);
+                                    sqlStringBuilder.AppendFormat("(@valueType{0}x{1}, @value{0}x{1}, @timestamp{0}x{1})", element.ValueTypeId, j);
+                                    insertCommand.Parameters.AddWithValue($"@valueType{element.ValueTypeId}x{j}", element.ValueTypeId);
+                                    insertCommand.Parameters.AddWithValue($"@value{element.ValueTypeId}x{j}", element.Data[j].Value);
+                                    insertCommand.Parameters.AddWithValue($"@timestamp{element.ValueTypeId}x{j}", DateTime.Now);
                                 }
                             }
                         }
 
                         insertCommand.CommandText = sqlStringBuilder.ToString();
-                        insertCommand.ExecuteNonQuery();
-                    }
+                        this.logger.LogTrace("String: \"{0}\"", insertCommand.CommandText);
 
-                    //connection.Execute($"INSERT INTO Heizung.DataValues (ValueType, Value, Timestamp) VALUES {string.Join(", ", insertValues)}");
+                        if (insertCommand.CommandText.Length > 0)
+                        {
+                            insertCommand.ExecuteNonQuery();
+                        }
+                    }
                 }
                 finally
                 {

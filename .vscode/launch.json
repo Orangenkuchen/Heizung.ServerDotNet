@@ -43,7 +43,38 @@
             "type": "PowerShell",
             "request": "launch",
             "script": "${workspaceFolder}/Transfer.ps1",
-            "cwd": "${cwd}"
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "-SshConnectionString",
+                "${input:SshConnection}"
+            ]
+        },
+        {
+            "name": "GetLogs",
+            "type": "PowerShell",
+            "request": "launch",
+            "script": "${workspaceFolder}/GetLogFiles.ps1",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "-SshConnectionString",
+                "${input:SshConnection}",
+                "-LogFilesFolderPath",
+                "${input:LogFilesFolderPath}"
+            ]
+        },
+    ],
+    "inputs": [
+        {
+            "id": "SshConnection",
+            "description": "Die SSH-Verbindung, welche verwendet werden soll.",
+            "type": "promptString",
+            "default": "dominik@Raspberry-Pi-3-b"
+        },
+        {
+            "id": "LogFilesFolderPath",
+            "description": "Der Pfad von den Logdateien vom Server",
+            "type": "promptString",
+            "default": "/home/dominik/.config/Heizung.ServerDotNet"
         }
     ]
 }

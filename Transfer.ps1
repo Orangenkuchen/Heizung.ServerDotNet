@@ -1,3 +1,10 @@
+[CmdletBinding()]
+param (
+    [Parameter(Mandatory=$true)]
+    [string]
+    $SshConnectionString
+)
+
 $ErrorActionPreference = 'Stop';
 
 $DebugPreference = 'Continue';
@@ -25,11 +32,11 @@ Remove-Item "./Heizungs-Server/appsettings.template.json";
 Write-Verbose "Konfig-Dateien entfernt.";
 
 Write-Debug "Stoppe den Heizungs-Server-Service";
-ssh dominik@Raspberry-Pi-3-b "sudo /bin/systemctl stop heizungs-server.service";
+ssh $SshConnectionString "sudo /bin/systemctl stop heizungs-server.service";
 Write-Verbose "Service wurde gestoppt";
 
 Write-Debug "Übertragen auf den Zielrechner...";
-scp -r ./Heizungs-Server dominik@Raspberry-Pi-3-b:~/;
+scp -r ./Heizungs-Server "$($SshConnectionString):~/";
 Write-Verbose "Übertragung abgeschlossen";
 
 Write-Verbose "Lösche den Transfer-Ordner lokal...";
@@ -37,11 +44,11 @@ Remove-Item -Path "./Heizungs-Server" -Recurse -Force;
 Write-Verbose "Ordner wurde gelöscht";
 
 Write-Debug "Ändere die Rechte von Heizungs-Server...";
-ssh dominik@Raspberry-Pi-3-b "chmod u+x ./Heizungs-Server/Heizung.ServerDotNet";
+ssh $SshConnectionString "chmod u+x ./Heizungs-Server/Heizung.ServerDotNet";
 Write-Verbose "Abgeschlossen";
 
 Write-Debug "Start den Heizungs-Server-Service";
-ssh dominik@Raspberry-Pi-3-b "sudo /bin/systemctl start heizungs-server.service";
+ssh $SshConnectionString "sudo /bin/systemctl start heizungs-server.service";
 Write-Verbose "Service wurde gestartet";
 
 Write-Host "Skript abgeschlossen";

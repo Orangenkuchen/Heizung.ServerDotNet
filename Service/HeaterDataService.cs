@@ -58,6 +58,11 @@ namespace Heizung.ServerDotNet.Service
         /// Hub zum senden von Nachrichten an Clients bezüglich den Heizungsdaten
         /// </summary>
         private readonly IHubContext<HeaterDataHub> heaterDataHub;
+
+        /// <summary>
+        /// Buffer von Historien-Heizungsdaten
+        /// </summary>
+        public IList<HeaterData> heaterValuesBuffer { get; private set; }
         #endregion
 
         #region events
@@ -92,6 +97,7 @@ namespace Heizung.ServerDotNet.Service
             this.destroyFunctions = new List<Action>();
             this.CurrentHeaterValues = new Dictionary<int, HeaterData>();
             this.doorOpeningsSinceFireOut = new List<DoorOpening>();
+            this.heaterValuesBuffer = new List<HeaterData>();
 
             this.heaterValueDescriptionDictionaryPromise = Task.Run<IDictionary<int, ValueDescription>>(() => {
                 // Das ConcurrentDictionary ist hier notwendig, da ansonsten Exceptions auftreten können bei mehreren Threads
@@ -111,23 +117,57 @@ namespace Heizung.ServerDotNet.Service
                 this.FillHeaterDataDictionaryByValueDescription(this.CurrentHeaterValues, task.Result);
             });
 
+            // Periodisches Speichern der Daten im Buffer-Array
+            var bufferTimer = new Timer(
+                (timerState) => {
+                    this.logger.LogDebug("Buffer HistoryDataTimer elapsed. Buffering Historydata.");
+
+                    if (this.CurrentHeaterValues.Count > 0)
+                    {
+                        foreach (var element in this.CurrentHeaterValues.Values)
+                        {
+                            if (element.IsLogged)
+                            {
+                                var heaterData = new HeaterData(element.Description, element.Unit)
+                                {
+                                    ValueTypeId = element.ValueTypeId,
+                                    IsLogged = element.IsLogged
+                                };
+
+                                var heaterDataPoint = new HeaterDataPoint(element.Data[0].Value);
+                                heaterDataPoint.TimeStamp = element.Data[0].TimeStamp;
+                                heaterData.Data.Add(heaterDataPoint);
+
+                                this.heaterValuesBuffer.Add(heaterData);
+                            }
+                        }
+                    }
+                }, 
+                null, 
+                0, 
+                Convert.ToInt32(new TimeSpan(0, 15, 0).TotalMilliseconds));
+
             // Periodisches Speichern der Daten in der Datenbank machen
             var saveTimer = new Timer(
                 (timerState) => {
                     this.logger.LogDebug("HistoryDataTimer elapsed. Saving Historydata.");
                     this.updateSinceDBSave = false;
 
-                    if (this.CurrentHeaterValues.Count > 0)
+                    if (this.heaterValuesBuffer.Count > 0)
                     {
-                        this.heaterRepository.SetHeaterValue(this.CurrentHeaterValues);
+                        this.heaterRepository.SetHeaterValue(this.heaterValuesBuffer);
+                        this.heaterValuesBuffer.Clear();
                     }
                 }, 
                 null, 
                 0, 
-                Convert.ToInt32(new TimeSpan(0, 15, 0).TotalMilliseconds));
+                Convert.ToInt32(new TimeSpan(24, 0, 0).TotalMilliseconds));
+
             this.destroyFunctions.Add(() => {
+                bufferTimer.Dispose();
                 saveTimer.Dispose();
                 saveTimer = null;
+                bufferTimer = null;
             });
 
             this.errorDictionaryPromise = Task.Run(() => {
