@@ -156,7 +156,10 @@ namespace Heizung.ServerDotNet
                                                             .Select((x) => x.Value)
                                                             .ToArray();
 
-                    logger.LogDebug("Füge CORS für folgende Origins hinzu: {0}", allowedOrigins);
+                    foreach(var element in allowedOrigins)
+                    {
+                        logger.LogDebug("Füge CORS für folgende Origins hinzu: {0}", element);
+                    }
                     builder.WithOrigins(allowedOrigins)
                            .AllowAnyMethod()
                            .AllowAnyHeader()

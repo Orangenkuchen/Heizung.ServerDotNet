@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": ".NET 7",
+            "name": ".NET 6",
             "type": "coreclr",
             "request": "launch",
             "WARNING01": "*********************************************************************************",

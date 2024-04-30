@@ -500,6 +500,7 @@ namespace Heizung.ServerDotNet.Data
 
                         var isFirst = true;
 
+                        var counter = 0;
                         foreach (var element in heaterDataList)
                         {
                             for (var j = 0; j < element.Data.Count; j++)
@@ -515,11 +516,13 @@ namespace Heizung.ServerDotNet.Data
                                         sqlStringBuilder.Append(", ");
                                     }
 
-                                    sqlStringBuilder.AppendFormat("(@valueType{0}x{1}, @value{0}x{1}, @timestamp{0}x{1})", element.ValueTypeId, j);
-                                    insertCommand.Parameters.AddWithValue($"@valueType{element.ValueTypeId}x{j}", element.ValueTypeId);
-                                    insertCommand.Parameters.AddWithValue($"@value{element.ValueTypeId}x{j}", element.Data[j].Value);
-                                    insertCommand.Parameters.AddWithValue($"@timestamp{element.ValueTypeId}x{j}", DateTime.Now);
+                                    sqlStringBuilder.AppendFormat("(@valueType{0}, @value{0}, @timestamp{0})", counter);
+                                    insertCommand.Parameters.AddWithValue($"@valueType{counter}", element.ValueTypeId);
+                                    insertCommand.Parameters.AddWithValue($"@value{counter}", element.Data[j].Value);
+                                    insertCommand.Parameters.AddWithValue($"@timestamp{counter}", DateTime.Now);
                                 }
+
+                                counter++;
                             }
                         }
 
