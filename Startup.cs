@@ -79,8 +79,22 @@ namespace Heizung.ServerDotNet
             });
 
             services.AddSingleton<IHeaterRepository>(
-                (serviceProvider) => {
-                    return new HeaterRepository(this.Configuration.GetConnectionString("HeaterDatabase")!, serviceProvider.GetService<ILogger>()!);
+                (serviceProvider) =>
+                {
+                    var heaterDatabaseConnectionString = this.Configuration.GetConnectionString("HeaterDatabase");
+                    var logger = serviceProvider.GetService<ILogger<IHeaterRepository>>();
+
+                    if (heaterDatabaseConnectionString == null)
+                    {
+                        throw new NullReferenceException("heaterDatabaseConnectionString is null while setting up HeaterRepository");
+                    }
+
+                    if (logger == null)
+                    {
+                        throw new NullReferenceException("logger is null while setting up HeaterRepository");
+                    }
+
+                    return new HeaterRepository(heaterDatabaseConnectionString, logger);
                 }
             );
             services.AddSingleton<IHeaterDataService, HeaterDataService>();
