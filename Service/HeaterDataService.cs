@@ -134,8 +134,10 @@ namespace Heizung.ServerDotNet.Service
                                     IsLogged = element.IsLogged
                                 };
 
-                                var heaterDataPoint = new HeaterDataPoint(element.Data[0].Value);
-                                heaterDataPoint.TimeStamp = element.Data[0].TimeStamp;
+                                var heaterDataPoint = new HeaterDataPoint(element.Data[0].Value)
+                                {
+                                    TimeStamp = element.Data[0].TimeStamp
+                                };
                                 heaterData.Data.Add(heaterDataPoint);
 
                                 this.heaterValuesBuffer.Add(heaterData);

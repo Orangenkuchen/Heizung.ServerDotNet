@@ -519,7 +519,7 @@ namespace Heizung.ServerDotNet.Data
                                     sqlStringBuilder.AppendFormat("(@valueType{0}, @value{0}, @timestamp{0})", counter);
                                     insertCommand.Parameters.AddWithValue($"@valueType{counter}", element.ValueTypeId);
                                     insertCommand.Parameters.AddWithValue($"@value{counter}", element.Data[j].Value);
-                                    insertCommand.Parameters.AddWithValue($"@timestamp{counter}", DateTime.Now);
+                                    insertCommand.Parameters.AddWithValue($"@timestamp{counter}", element.Data[j].TimeStamp);
                                 }
 
                                 counter++;
