@@ -168,6 +168,24 @@ namespace Heizung.ServerDotNet.Controllers
         }
         #endregion
 
+        #region HistoryData PUT
+        /// <summary>
+        /// Fügt Historien-Daten in die Datenbank hinzu, wenn diese noch nicht vorhanden sind.
+        /// </summary>
+        /// <param name="historyHeaterValues">Die Daten, die eingefügt werden sollen.</param>
+        /// <response code="204">Die Historien-Daten wurde eingefügt</response>
+        [HttpPut]
+        public ActionResult HistoryData([FromBody]IList<HistoryHeaterValue> historyHeaterValues)
+        {
+            this.logger.LogTrace("HistoryData called PUT");
+
+            this.heaterDataService.SetHistoryData(historyHeaterValues);
+
+            this.logger.LogTrace("HistoryData finished");
+            return base.NoContent();
+        }
+        #endregion
+
         #region OperatingHoures GET
         /// <summary>
         /// Ermittelt die Betriebsstunden im angegeben Zeitraum

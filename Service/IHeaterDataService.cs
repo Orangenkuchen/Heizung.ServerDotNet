@@ -31,5 +31,16 @@ namespace Heizung.ServerDotNet.Service
         /// <param name="heaterValues">Die neuen Daten</param>
         void SetNewData(IList<HeaterValue> heaterValues);
         #endregion
+
+        #region SetHistoryData
+        /// <summary>
+        /// Fügt die Heizungsdaten in die Datenbank ein, wenn diese noch nicht vorhanden sind oder neuer sind..
+        /// </summary>
+        /// <remarks>
+        /// Dünnt beim Einfügen die Daten aus, wenn diese zu häufig in einem Zeitraum vorkommen.
+        /// </remarks>
+        /// <param name="historyHeaterValues">Die Heizungsdaten, die eingefügt werden sollen.</param>
+        void SetHistoryData(IList<HistoryHeaterValue> historyHeaterValues);
+        #endregion
     }
 }

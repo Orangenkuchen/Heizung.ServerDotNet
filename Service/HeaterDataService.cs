@@ -60,6 +60,15 @@ namespace Heizung.ServerDotNet.Service
         private readonly IHubContext<HeaterDataHub> heaterDataHub;
 
         /// <summary>
+        /// Die zeitliche Auflösung der HistorienDaten in der Datenbank.
+        /// </summary>
+        /// <remarks>
+        /// Wenn der Wert z.B. 15m wurden die Daten in der Datenbank normalerweise
+        /// alle 15m geschrieben.
+        /// </remarks>
+        private readonly TimeSpan historyDataTimeResolution;
+
+        /// <summary>
         /// Buffer von Historien-Heizungsdaten
         /// </summary>
         public IList<HeaterData> heaterValuesBuffer { get; private set; }
@@ -98,6 +107,8 @@ namespace Heizung.ServerDotNet.Service
             this.CurrentHeaterValues = new Dictionary<int, HeaterData>();
             this.doorOpeningsSinceFireOut = new List<DoorOpening>();
             this.heaterValuesBuffer = new List<HeaterData>();
+
+            this.historyDataTimeResolution = TimeSpan.FromMinutes(15);
 
             this.heaterValueDescriptionDictionaryPromise = Task.Run<IDictionary<int, ValueDescription>>(() => {
                 // Das ConcurrentDictionary ist hier notwendig, da ansonsten Exceptions auftreten können bei mehreren Threads
@@ -301,6 +312,59 @@ namespace Heizung.ServerDotNet.Service
             }
 
             this.logger.LogTrace("SetNewData ended");
+        }
+        #endregion
+
+        #region SetHistoryData
+        /// <inheritdoc cref="SetHistoryData(IList{HistoryHeaterValue})"/>
+        public void SetHistoryData(IList<HistoryHeaterValue> historyHeaterValues)
+        {
+            var minDate = historyHeaterValues.Min((x) => x.Timestamp);
+            var maxDate = historyHeaterValues.Max((x) => x.Timestamp);
+
+            var startPoint = new DateTime(
+                minDate.Year,
+                minDate.Month,
+                minDate.Day,
+                minDate.Hour,
+                Math.Abs(minDate.Minute / this.historyDataTimeResolution.Minutes) * this.historyDataTimeResolution.Minutes,
+                0
+            );
+
+            var heaterDataDictionary = new Dictionary<int, HeaterData>();
+
+            for (var i = startPoint; i < maxDate; i = i.Add(this.historyDataTimeResolution))
+            {
+                var latestInChunk = historyHeaterValues.Where((x) => x.Timestamp > i && x.Timestamp < i + this.historyDataTimeResolution)
+                                                       .MaxBy((x) => x.Timestamp);
+
+                if (latestInChunk != null)
+                {
+                    if (heaterDataDictionary.ContainsKey(latestInChunk.Index) == false)
+                    {
+                        heaterDataDictionary.Add(
+                            latestInChunk.Index, 
+                            new HeaterData(latestInChunk.Name, latestInChunk.Unit)
+                            {
+                                IsLogged = false,
+                                ValueTypeId = latestInChunk.Index,
+                                Data = new List<HeaterDataPoint>()
+                            }
+                        );
+                    }
+
+                    var multiplicator = latestInChunk.Multiplicator > 0 ? latestInChunk.Multiplicator : 1;
+
+                    heaterDataDictionary[latestInChunk.Index].Data.Add(
+                        new HeaterDataPoint(Convert.ToDouble(latestInChunk.Value) / multiplicator)
+                        {
+                            TimeStamp = latestInChunk.Timestamp
+                        }
+                    );
+                }
+            }
+
+            this.heaterRepository.SetHeaterValue(heaterDataDictionary.Values);
         }
         #endregion
 
