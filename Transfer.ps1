@@ -22,7 +22,7 @@ Write-Verbose "Publish abgeschlossen";
 
 Write-Verbose "Lege den Ordner für Transfer an..."
 New-Item -ItemType Directory -Path "Heizungs-Server" -Force;
-Copy-Item -Path "./bin/Release/net6.0/linux-arm/publish/*" -Recurse -Force -Destination "./Heizungs-Server";
+Copy-Item -Path "./bin/Release/net8.0/linux-arm/publish/*" -Recurse -Force -Destination "./Heizungs-Server";
 Write-Verbose "Oder für Transfer angelegt";
 
 Write-Debug "Entferne die Konfig-Dateien vor der übertragung...";
