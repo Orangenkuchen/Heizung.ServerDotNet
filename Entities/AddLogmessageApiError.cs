@@ -1,5 +1,9 @@
 namespace Heizung.ServerDotNet.Entities
 {
+    /// <summary>
+    /// Dieser Fehler tritt auf, wenn der Client versucht eine Lognachricht zu Loggen, welche
+    /// niedriger ist als der minimale Log-Level
+    /// </summary>
     public class AddLogmessageApiError
     {
         #region ctor

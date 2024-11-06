@@ -118,7 +118,7 @@ namespace Heizung.ServerDotNet.Controllers
         /// <para>Speichert die Lognachricht auf dem Server, wenn dieser aktuell 
         /// Nachrichten mit diesem Level annimt.</para>
         /// <para>Gibt eine Fehlermeldung zurück, wenn der Level nicht hoch genug ist.</para>
-        /// <para>Kann bei <see cref="MinimumLevel" /> ermittelt werden.</para>
+        /// <para>Kann bei <see cref="MinimumLevel()" /> ermittelt werden.</para>
         /// </summary>
         /// <param name="clientIdentification">
         /// Die Identifikation vom User. Diese wird selbst vom Client vergeben
@@ -151,7 +151,7 @@ namespace Heizung.ServerDotNet.Controllers
                 message = "<{clientIdentification}> " + message;
                 if (options.Error != null)
                 {
-                    var stringError = options.Error.ToString();
+                    var stringError = options.Error.ToString() ?? "";
 
                     stringError = stringError.Replace("{", "{{");
                     stringError = stringError.Replace("}", "}}");

@@ -8,7 +8,6 @@ namespace Heizung.ServerDotNet.Data
     using System.Threading.Tasks;
     using System.Linq;
     using System.Text;
-    using FluentMigrator.Runner;
     using Microsoft.Extensions.Logging;
 
     /// <summary>
@@ -16,13 +15,6 @@ namespace Heizung.ServerDotNet.Data
     /// </summary>
     public class HeaterRepository : IHeaterRepository
     {
-        #region static
-        /// <summary>
-        /// Formatstring, welche ein DateTime so umwandelt, dass es von der Datenbank erkannt wird
-        /// </summary>
-        private static string databaseDateTimeFormatString = "YYYY-MM-DD HH:mm:ss";
-        #endregion
-
         #region fields
         /// <summary>
         /// Der Verbindungsstring zur Datenbank

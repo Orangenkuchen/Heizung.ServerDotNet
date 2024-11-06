@@ -5,18 +5,18 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": ".NET 6",
+            "name": ".NET 8",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/bin/Debug/net6.0/Heizung.ServerDotNet.dll",
+            "program": "${workspaceFolder}/bin/Debug/net8.0/Heizung.ServerDotNet.dll",
             "args": [],
             "cwd": "${workspaceFolder}",
             "console": "internalConsole",
             "stopAtEntry": false
         },
         {
-            "name": ".NET 7 Attach",
+            "name": ".NET 8 Attach",
             "type": "coreclr",
             "request": "attach",
             "processId": "${command:pickProcess}"

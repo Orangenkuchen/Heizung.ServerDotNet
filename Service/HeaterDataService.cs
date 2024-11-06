@@ -29,11 +29,6 @@ namespace Heizung.ServerDotNet.Service
         private IList<Action> destroyFunctions;
 
         /// <summary>
-        /// Zeit an, das neue Daten empfangen wurden seit dem letzten Speichern in der Datenbnak
-        /// </summary>
-        private bool updateSinceDBSave;
-
-        /// <summary>
         /// Promise für ein Dictionary mit den HeaterValueDescrptions aus der Datenbank.
         /// Enthält z.B. ob die Daten geloggt werden sollen
         /// </summary>
@@ -164,7 +159,6 @@ namespace Heizung.ServerDotNet.Service
             var saveTimer = new Timer(
                 (timerState) => {
                     this.logger.LogDebug("HistoryDataTimer elapsed. Saving Historydata.");
-                    this.updateSinceDBSave = false;
 
                     if (this.heaterValuesBuffer.Count > 0)
                     {
@@ -215,7 +209,6 @@ namespace Heizung.ServerDotNet.Service
         public async void SetNewData(IList<HeaterValue> heaterValues) 
         {
             this.logger.LogTrace("SetNewData started");
-            this.updateSinceDBSave = true;
 
             await Task.WhenAll(this.heaterValueDescriptionDictionaryPromise, this.errorDictionaryPromise);
 

@@ -60,7 +60,7 @@ namespace Heizung.ServerDotNet
             Serilog.Log.Debug("Konfiguriere die Services vom Webserver");
 
             var mailConfig = new MailConfiguration(
-                this.Configuration["MailConfig:WarningMail:SmtpHostServer"], 
+                this.Configuration["MailConfig:WarningMail:SmtpHostServer"] ?? "", 
                 new NetworkCredential(this.Configuration["MailConfig:WarningMail:UserName"], this.Configuration["MailConfig:WarningMail:UserPassword"]))
             {
                 SmtpServerPort = this.Configuration.GetValue<uint>("MailConfig:WarningMail:SmtpHostPort")
@@ -165,9 +165,9 @@ namespace Heizung.ServerDotNet
             app.UseCors(
                 builder => 
                 {
-                    var allowedOrigins = this.Configuration.GetSection("AllowedCorsOrigins")
+                    string[] allowedOrigins = this.Configuration.GetSection("AllowedCorsOrigins")
                                                             .GetChildren()
-                                                            .Select((x) => x.Value)
+                                                            .Select((x) => x.Value ?? "")
                                                             .ToArray();
 
                     foreach(var element in allowedOrigins)
@@ -192,9 +192,9 @@ namespace Heizung.ServerDotNet
                 endpoints.MapHub<HeaterDataHub>(heaterDataHubAddress);
 
                 var heaterDataHubContext = app.ApplicationServices.GetService<IHubContext<HeaterDataHub>>();
-                app.ApplicationServices.GetService<IHeaterDataService>().NewDataEvent += (currentHeaterDataDictionary) =>
+                app.ApplicationServices.GetService<IHeaterDataService>()!.NewDataEvent += (currentHeaterDataDictionary) =>
                 {
-                    heaterDataHubContext.Clients.All.SendAsync("CurrentHeaterData", currentHeaterDataDictionary);
+                    heaterDataHubContext?.Clients.All.SendAsync("CurrentHeaterData", currentHeaterDataDictionary);
                 };
             });
         }
