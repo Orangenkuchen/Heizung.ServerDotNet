@@ -326,34 +326,42 @@ namespace Heizung.ServerDotNet.Service
 
             var heaterDataDictionary = new Dictionary<int, HeaterData>();
 
-            for (var i = startPoint; i < maxDate; i = i.Add(this.historyDataTimeResolution))
+            var groupedHeaterValues = historyHeaterValues.GroupBy((x) => x.Index);
+
+            foreach(var group in groupedHeaterValues)
             {
-                var latestInChunk = historyHeaterValues.Where((x) => x.Timestamp > i && x.Timestamp < i + this.historyDataTimeResolution)
-                                                       .MaxBy((x) => x.Timestamp);
-
-                if (latestInChunk != null)
+                for (var i = startPoint; i < maxDate; i = i.Add(this.historyDataTimeResolution))
                 {
-                    if (heaterDataDictionary.ContainsKey(latestInChunk.Index) == false)
+                    var latestInChunk = group.Where((x) => x.Timestamp > i && x.Timestamp < i + this.historyDataTimeResolution)
+                                             .MaxBy((x) => x.Timestamp);
+
+                    if (latestInChunk != null)
                     {
-                        heaterDataDictionary.Add(
-                            latestInChunk.Index, 
-                            new HeaterData(latestInChunk.Name, latestInChunk.Unit)
-                            {
-                                IsLogged = false,
-                                ValueTypeId = latestInChunk.Index,
-                                Data = new List<HeaterDataPoint>()
-                            }
-                        );
-                    }
-
-                    var multiplicator = latestInChunk.Multiplicator > 0 ? latestInChunk.Multiplicator : 1;
-
-                    heaterDataDictionary[latestInChunk.Index].Data.Add(
-                        new HeaterDataPoint(Convert.ToDouble(latestInChunk.Value) / multiplicator)
+                        if (heaterDataDictionary.ContainsKey(latestInChunk.Index) == false)
                         {
-                            TimeStamp = latestInChunk.Timestamp
+                            heaterDataDictionary.Add(
+                                latestInChunk.Index, 
+                                new HeaterData(latestInChunk.Name, latestInChunk.Unit)
+                                {
+                                    IsLogged = false,
+                                    ValueTypeId = latestInChunk.Index,
+                                    Data = new List<HeaterDataPoint>()
+                                }
+                            );
                         }
-                    );
+
+                        var multiplicator = latestInChunk.Multiplicator > 0 ? latestInChunk.Multiplicator : 1;
+
+                        if (latestInChunk.Index != 99)
+                        {
+                            heaterDataDictionary[latestInChunk.Index].Data.Add(
+                                new HeaterDataPoint(Convert.ToDouble(latestInChunk.Value) / multiplicator)
+                                {
+                                    TimeStamp = latestInChunk.Timestamp
+                                }
+                            );
+                        }
+                    }
                 }
             }
 

@@ -177,7 +177,7 @@ namespace Heizung.ServerDotNet.Controllers
         [HttpPut]
         public ActionResult HistoryData([FromBody]IList<HistoryHeaterValue> historyHeaterValues)
         {
-            this.logger.LogTrace("HistoryData called PUT");
+            this.logger.LogInformation("HistoryData called PUT (Count: {0})", historyHeaterValues.Count);
 
             this.heaterDataService.SetHistoryData(historyHeaterValues);
 
