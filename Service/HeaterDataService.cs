@@ -168,7 +168,7 @@ namespace Heizung.ServerDotNet.Service
                 }, 
                 null, 
                 0, 
-                Convert.ToInt32(new TimeSpan(24, 0, 0).TotalMilliseconds));
+                Convert.ToInt32(new TimeSpan(0, 5, 0).TotalMilliseconds));
 
             this.destroyFunctions.Add(() => {
                 bufferTimer.Dispose();
