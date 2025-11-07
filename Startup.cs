@@ -60,7 +60,7 @@ namespace Heizung.ServerDotNet
             Serilog.Log.Debug("Konfiguriere die Services vom Webserver");
 
             var mailConfig = new MailConfiguration(
-                this.Configuration["MailConfig:WarningMail:SmtpHostServer"], 
+                this.Configuration["MailConfig:WarningMail:SmtpHostServer"] ?? throw new Exception("Konfigurationswert \"MailConfig:WarningMail:SmtpHostServer\" wurd in der Konfiguration nicht gefunden"), 
                 new NetworkCredential(this.Configuration["MailConfig:WarningMail:UserName"], this.Configuration["MailConfig:WarningMail:UserPassword"]))
             {
                 SmtpServerPort = this.Configuration.GetValue<uint>("MailConfig:WarningMail:SmtpHostPort")
@@ -101,12 +101,14 @@ namespace Heizung.ServerDotNet
 
             services.AddCors();
 
+#pragma warning disable IL2026, IL3050 // "This can break functionality when trimming application code." = "Muss später umgestellt werden, damit SignalR nicht verwendet wird (weil depricated)"
             services.AddControllers()
                     .AddNewtonsoftJson(options => 
                     {
                         options.SerializerSettings.Converters.Add(new StringEnumConverter());
                     });
             services.AddSignalR();
+#pragma warning restore IL2026, IL3050
             
             services.AddSwaggerGenNewtonsoftSupport();
             services.AddSwaggerGen(c =>
@@ -167,7 +169,7 @@ namespace Heizung.ServerDotNet
                 {
                     var allowedOrigins = this.Configuration.GetSection("AllowedCorsOrigins")
                                                             .GetChildren()
-                                                            .Select((x) => x.Value)
+                                                            .Select((x) => x.Value ?? "")
                                                             .ToArray();
 
                     foreach(var element in allowedOrigins)
@@ -191,8 +193,8 @@ namespace Heizung.ServerDotNet
                 logger.LogDebug("Füge den Hub {0} unter dem API-Punkt {1} hinzu", nameof(HeaterDataHub), heaterDataHubAddress);
                 endpoints.MapHub<HeaterDataHub>(heaterDataHubAddress);
 
-                var heaterDataHubContext = app.ApplicationServices.GetService<IHubContext<HeaterDataHub>>();
-                app.ApplicationServices.GetService<IHeaterDataService>().NewDataEvent += (currentHeaterDataDictionary) =>
+                var heaterDataHubContext = app.ApplicationServices.GetService<IHubContext<HeaterDataHub>>()!;
+                app.ApplicationServices.GetService<IHeaterDataService>()!.NewDataEvent += (currentHeaterDataDictionary) =>
                 {
                     heaterDataHubContext.Clients.All.SendAsync("CurrentHeaterData", currentHeaterDataDictionary);
                 };

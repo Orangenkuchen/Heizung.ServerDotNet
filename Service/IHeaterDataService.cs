@@ -2,6 +2,8 @@ namespace Heizung.ServerDotNet.Service
 {
     using System;
     using System.Collections.Generic;
+    using System.Threading;
+    using System.Threading.Tasks;
     using Heizung.ServerDotNet.Entities;
 
     /// <summary>
@@ -29,7 +31,8 @@ namespace Heizung.ServerDotNet.Service
         /// wird das NewDataEvnet ausgelöst
         /// </summary>
         /// <param name="heaterValues">Die neuen Daten</param>
-        void SetNewData(IList<HeaterValue> heaterValues);
+        /// <param name="cancellationToken">Token mit dem die Ausführung der Abfrage abgebrochen werden kann</param>
+        Task SetNewData(IList<HeaterValue> heaterValues, CancellationToken cancellationToken);
         #endregion
     }
 }

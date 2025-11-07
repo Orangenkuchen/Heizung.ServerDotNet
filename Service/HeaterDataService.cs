@@ -29,11 +29,6 @@ namespace Heizung.ServerDotNet.Service
         private IList<Action> destroyFunctions;
 
         /// <summary>
-        /// Zeit an, das neue Daten empfangen wurden seit dem letzten Speichern in der Datenbnak
-        /// </summary>
-        private bool updateSinceDBSave;
-
-        /// <summary>
         /// Promise für ein Dictionary mit den HeaterValueDescrptions aus der Datenbank.
         /// Enthält z.B. ob die Daten geloggt werden sollen
         /// </summary>
@@ -99,11 +94,11 @@ namespace Heizung.ServerDotNet.Service
             this.doorOpeningsSinceFireOut = new List<DoorOpening>();
             this.heaterValuesBuffer = new List<HeaterData>();
 
-            this.heaterValueDescriptionDictionaryPromise = Task.Run<IDictionary<int, ValueDescription>>(() => {
+            this.heaterValueDescriptionDictionaryPromise = Task.Run<IDictionary<int, ValueDescription>>(async () => {
                 // Das ConcurrentDictionary ist hier notwendig, da ansonsten Exceptions auftreten können bei mehreren Threads
                 IDictionary<int, ValueDescription> result = new ConcurrentDictionary<int, ValueDescription>();
                 
-                var valueDescriptions = this.heaterRepository.GetAllValueDescriptions();
+                var valueDescriptions = await this.heaterRepository.GetAllValueDescriptions(CancellationToken.None);
 
                 foreach (var valueDescription in valueDescriptions)
                 {
@@ -151,13 +146,12 @@ namespace Heizung.ServerDotNet.Service
 
             // Periodisches Speichern der Daten in der Datenbank machen
             var saveTimer = new Timer(
-                (timerState) => {
+                async (timerState) => {
                     this.logger.LogDebug("HistoryDataTimer elapsed. Saving Historydata.");
-                    this.updateSinceDBSave = false;
 
                     if (this.heaterValuesBuffer.Count > 0)
                     {
-                        this.heaterRepository.SetHeaterValue(this.heaterValuesBuffer);
+                        await this.heaterRepository.SetHeaterValue(this.heaterValuesBuffer, CancellationToken.None);
                         this.heaterValuesBuffer.Clear();
                     }
                 }, 
@@ -172,8 +166,8 @@ namespace Heizung.ServerDotNet.Service
                 bufferTimer = null;
             });
 
-            this.errorDictionaryPromise = Task.Run(() => {
-                IDictionary<int, ErrorDescription> result = new ConcurrentDictionary<int, ErrorDescription>(this.heaterRepository.GetAllErrorDictionary());
+            this.errorDictionaryPromise = Task.Run(async () => {
+                IDictionary<int, ErrorDescription> result = new ConcurrentDictionary<int, ErrorDescription>(await this.heaterRepository.GetAllErrorDictionary(CancellationToken.None));
 
                 return result;
             });
@@ -196,15 +190,10 @@ namespace Heizung.ServerDotNet.Service
         #endregion
 
         #region SetNewData
-        /// <summary>
-        /// Setzt die neuen Heizungsdaten. Wenn neuen Daten sich von den bisherigen unterscheiden
-        /// wird das NewDataEvnet ausgelöst
-        /// </summary>
-        /// <param name="heaterValues">Die neuen Daten</param>
-        public async void SetNewData(IList<HeaterValue> heaterValues) 
+        /// <inheritdoc />
+        public async Task SetNewData(IList<HeaterValue> heaterValues, CancellationToken cancellationToken) 
         {
             this.logger.LogTrace("SetNewData started");
-            this.updateSinceDBSave = true;
 
             await Task.WhenAll(this.heaterValueDescriptionDictionaryPromise, this.errorDictionaryPromise);
 
@@ -250,14 +239,18 @@ namespace Heizung.ServerDotNet.Service
 
                     if (errorId == null) 
                     {
-                        errorId = this.heaterRepository.SetNewError(errorValue);
+                        errorId = await this.heaterRepository.SetNewError(errorValue, cancellationToken);
 
                         if (errorDictionary.ContainsKey(errorId.Value) == false)
                         {
-                            errorDictionary.Add(errorId.Value, new ErrorDescription(errorValue)
-                            {
-                                Id = errorId.Value
-                            });
+                            errorDictionary.Add(
+                                errorId.Value,
+                                new ErrorDescription()
+                                {
+                                    Id = errorId.Value,
+                                    Description = errorValue
+                                }
+                            );
                         }
                     }
 

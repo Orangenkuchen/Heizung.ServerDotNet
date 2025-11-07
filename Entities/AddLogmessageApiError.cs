@@ -1,5 +1,8 @@
 namespace Heizung.ServerDotNet.Entities
 {
+    /// <summary>
+    /// Stellt eine Fehlerbeschreibung von einem Fehler beim Schreiben von Lognachrichten
+    /// </summary>
     public class AddLogmessageApiError
     {
         #region ctor

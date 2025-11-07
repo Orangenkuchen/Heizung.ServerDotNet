@@ -36,7 +36,7 @@ namespace Heizung.ServerDotNet.Entities
 
         #region MicrosoftLoggingLevelSwitch
         /// <summary>
-        /// Dieser LoggingLevelSwitch ist für alle Lognachrichten aktiv, welche als Quelle Microsoft haben. (Überschreibt <see cref="GeneralLoggingLevelSwitch"/> für Microsoft-Nachrichten.)
+        /// Dieser LoggingLevelSwitch ist für alle Lognachrichten aktiv, welche als Quelle Microsoft haben. (Überschreibt <see cref="GerneralLoggingLevelSwitch"/> für Microsoft-Nachrichten.)
         /// </summary>
         /// <value></value>
         public LoggingLevelSwitch MicrosoftLoggingLevelSwitch { get; private set; }
@@ -44,7 +44,7 @@ namespace Heizung.ServerDotNet.Entities
 
         #region ClientLoggingLevelSwitch
         /// <summary>
-        /// Dieser LoggingLevelSwitch ist für alle Lognachrichten aktiv, welche als Quelle 'Client' haben. Das beinhaltet alle Lognarichten vom Web-Client. (Überschreibt <see cref="GeneralLoggingLevelSwitch"/> für Client-Nachrichten.)
+        /// Dieser LoggingLevelSwitch ist für alle Lognachrichten aktiv, welche als Quelle 'Client' haben. Das beinhaltet alle Lognarichten vom Web-Client. (Überschreibt <see cref="GerneralLoggingLevelSwitch"/> für Client-Nachrichten.)
         /// </summary>
         /// <value></value>
         public LoggingLevelSwitch ClientLoggingLevelSwitch { get; private set; }

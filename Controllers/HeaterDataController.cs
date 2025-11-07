@@ -3,9 +3,11 @@ namespace Heizung.ServerDotNet.Controllers
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Threading.Tasks;
     using Heizung.ServerDotNet.Data;
     using Heizung.ServerDotNet.Entities;
     using Heizung.ServerDotNet.Service;
+    using Microsoft.AspNetCore.Http;
     using Microsoft.AspNetCore.Mvc;
     using Microsoft.Extensions.Logging;
 
@@ -51,22 +53,25 @@ namespace Heizung.ServerDotNet.Controllers
         }
         #endregion
 
-        #region Data
+        #region Data GET
         /// <summary>
         /// Ermittelt die Heizungsdaten im angegeben Zeitraum
         /// </summary>
         /// <param name="fromDate">Der Startzeitpunkt der Datenbeschaffung</param>
         /// <param name="toDate">Der Endzeitpunkt der Datenbeschaffung</param>
-        /// <returns>Gibt die Daten als IDictionary zurück</returns>
+        /// <response code="200">Die Heizungsdaten wurden ermittelt</response>
+        /// <response code="400">Die Anfrage war fehlerhaft</response>
         [HttpGet]
-        public ActionResult<IDictionary<int, HeaterData>> Data(DateTime fromDate, DateTime toDate)
+        [ProducesResponseType(typeof(IDictionary<int, HeaterData>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<IDictionary<int, HeaterData>>> Data(DateTime fromDate, DateTime toDate)
         {
             this.logger.LogTrace("Data: Get called");
             IDictionary<int, HeaterData> result = new Dictionary<int, HeaterData>();
 
-            var valueDescriptions = this.heaterRepository.GetAllValueDescriptions();
-            var errorDescription = this.heaterRepository.GetAllErrorDictionary();
-            var dataList = this.heaterRepository.GetDataValues(fromDate, toDate);
+            var valueDescriptions = await this.heaterRepository.GetAllValueDescriptions(base.HttpContext.RequestAborted);
+            var errorDescription = await this.heaterRepository.GetAllErrorDictionary(base.HttpContext.RequestAborted);
+            var dataList = await this.heaterRepository.GetDataValues(fromDate, toDate, base.HttpContext.RequestAborted);
 
             foreach (var valueDescription in valueDescriptions)
             {
@@ -117,18 +122,21 @@ namespace Heizung.ServerDotNet.Controllers
         }
         #endregion
 
-        #region ValueDescriptions
+        #region ValueDescriptions GET
         /// <summary>
         /// Ermittelt die Beschreibungen zu den Heizungsdaten
         /// </summary>
-        /// <returns>Gibt die Daten als IDictionary zurück</returns>
+        /// <response code="200">Die Beschreibungen von den Werten wurden erittelt</response>
+        /// <response code="400">Die Anfrage war fehlerhaft</response>
         [HttpGet]
-        public ActionResult<IDictionary<int, ValueDescription>> ValueDescriptions()
+        [ProducesResponseType(typeof(IDictionary<int, ValueDescription>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<IDictionary<int, ValueDescription>>> ValueDescriptions()
         {
             this.logger.LogTrace("ValueDescriptions called");
             IDictionary<int, ValueDescription> result = new Dictionary<int, ValueDescription>();
 
-            var valueDescriptions = this.heaterRepository.GetAllValueDescriptions();
+            var valueDescriptions = await this.heaterRepository.GetAllValueDescriptions(base.HttpContext.RequestAborted);
             
             result = valueDescriptions.ToDictionary((x) => x.Id);
 
@@ -141,8 +149,11 @@ namespace Heizung.ServerDotNet.Controllers
         /// <summary>
         /// Ermittelt die Heizungsdaten welche zuletzt empfangen wurden
         /// </summary>
-        /// <returns>Gibt die Daten als IDictionary zurück</returns>
+        /// <response code="200">Die aktuelle Daten wurden ermittelt</response>
+        /// <response code="400">Die Anfrage war fehlerhaft</response>
         [HttpGet]
+        [ProducesResponseType(typeof(IDictionary<int, HeaterData>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public ActionResult<IDictionary<int, HeaterData>> Latest()
         {
             this.logger.LogTrace("Latest called");
@@ -155,13 +166,16 @@ namespace Heizung.ServerDotNet.Controllers
         /// Setzt die neuen Heizungsdaten als aktuelle Daten
         /// </summary>
         /// <param name="heaterValues">Die Heizungsdaten welche gesetzt werden sollen</param>
-        /// <returns></returns>
+        /// <response code="204">Die Daten wurde gesetzt</response>
+        /// <response code="400">Die Anfrage war fehlerhaft</response>
         [HttpPut]
-        public ActionResult Latest([FromBody]IList<HeaterValue> heaterValues)
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult> Latest([FromBody]IList<HeaterValue> heaterValues)
         {
             this.logger.LogTrace("Latest called PUT");
 
-            this.heaterDataService.SetNewData(heaterValues);
+            await this.heaterDataService.SetNewData(heaterValues, base.HttpContext.RequestAborted);
 
             this.logger.LogTrace("Latest finished");
             return base.NoContent();
@@ -174,12 +188,15 @@ namespace Heizung.ServerDotNet.Controllers
         /// </summary>
         /// <param name="fromDate">Der Startzeitpunkt der Datenbeschaffung</param>
         /// <param name="toDate">Der Endzeitpunkt der Datenbeschaffung</param>
-        /// <returns>Gibt die Daten als IList zurück</returns>
+        /// <response code="200">Die Betriebsstunden wurden ermittelt</response>
+        /// <response code="400">Die Anfrage war fehlerhaft</response>
         [HttpGet]
-        public ActionResult<IList<DayOperatingHoures>> OperatingHoures(DateTime fromDate, DateTime toDate)
+        [ProducesResponseType(typeof(IList<DayOperatingHoures>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<IList<DayOperatingHoures>>> OperatingHoures(DateTime fromDate, DateTime toDate)
         {
             this.logger.LogTrace("OperatingHoures: Get called");
-            IList<DayOperatingHoures> result = this.heaterRepository.GetOperatingHoures(fromDate, toDate);
+            IList<DayOperatingHoures> result = await this.heaterRepository.GetOperatingHoures(fromDate, toDate, base.HttpContext.RequestAborted);
 
             this.logger.LogTrace("Get finished");
             return base.Ok(result);
@@ -191,16 +208,25 @@ namespace Heizung.ServerDotNet.Controllers
         /// Stellt ein, welche Daten in der Historie aufgezeichnet werden
         /// </summary>
         /// <param name="loggingStates">Die Heizungsdaten welche gesetzt werden sollen</param>
-        /// <returns>Gibt die Daten als IDictionary zurück</returns>
+        /// <response code="204">Die Änderung wurde übernommen</response>
+        /// <response code="400">Die Anfrage war fehlerhaft</response>
         [HttpPut]
-        public ActionResult LoggingState([FromBody]IList<LoggingState> loggingStates)
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult> LoggingState([FromBody]IList<LoggingState> loggingStates)
         {
             this.logger.LogTrace("LoggingState called");
 
-            this.heaterRepository.SetLoggingStateOfVaueType(loggingStates);
+            var result = await this.heaterRepository.SetLoggingStateOfVaueType(loggingStates, base.HttpContext.RequestAborted);
 
-            this.logger.LogTrace("LoggingState finished");
-            return base.NoContent();
+            if (result == true)
+            {
+                return base.NoContent();
+            }
+            else
+            {
+                throw new Exception("Repository didn't change logging state");
+            }
         }
         #endregion
     }

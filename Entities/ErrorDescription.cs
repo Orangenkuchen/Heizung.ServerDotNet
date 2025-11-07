@@ -9,10 +9,9 @@ namespace Heizung.ServerDotNet.Entities
         /// <summary>
         /// Initialisiert die Klasse
         /// </summary>
-        /// <param name="description">Die Beschreibung vom Fehler</param>
-        public ErrorDescription(string description)
+        public ErrorDescription()
         {
-            this.Description = description;
+            this.Description = "";
         }
         #endregion
 

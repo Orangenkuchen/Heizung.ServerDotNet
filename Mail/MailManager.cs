@@ -6,6 +6,8 @@ namespace Heizung.ServerDotNet.Mail
     using System.Net;
     using System.Net.Mail;
     using System.Text;
+    using System.Threading;
+    using System.Threading.Tasks;
     using Heizung.ServerDotNet.Data;
     using Microsoft.Extensions.Logging;
 
@@ -63,12 +65,13 @@ namespace Heizung.ServerDotNet.Mail
         /// Überprüft die Temperaturwerte und sendet Mail, wenn die Tempratur zu niedrig ist, ein Fehler anliegt 
         /// oder keine Werte mehr empfangen werden
         /// </summary>
-        public void SendMailWhenCheckFails()
+        /// <param name="cancellationToken">Token mit dem die Ausführung der Funkion abgebrochen werden kann</param>
+        public async Task SendMailWhenCheckFails(CancellationToken cancellationToken)
         {
             this.logger.LogTrace("SendMailWhenCheckFails started");
 
-            var latestDataValuesDictionary = this.heaterRepository.GetLatestDataValues();
-            var mailNotifierConfig = this.heaterRepository.GetMailNotifierConfig();
+            var latestDataValuesDictionary = await this.heaterRepository.GetLatestDataValues(cancellationToken);
+            var mailNotifierConfig = await this.heaterRepository.GetMailNotifierConfig(cancellationToken);
 
             IList<string> mailStrings = new List<string>();
 

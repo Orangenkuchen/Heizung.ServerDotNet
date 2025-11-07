@@ -10,19 +10,13 @@ namespace Heizung.ServerDotNet.Data
     using System.Text;
     using FluentMigrator.Runner;
     using Microsoft.Extensions.Logging;
+    using System.Threading;
 
     /// <summary>
     /// DataRepository für Datenbankanfragen bezüglich der Heizung
     /// </summary>
     public class HeaterRepository : IHeaterRepository
     {
-        #region static
-        /// <summary>
-        /// Formatstring, welche ein DateTime so umwandelt, dass es von der Datenbank erkannt wird
-        /// </summary>
-        private static string databaseDateTimeFormatString = "YYYY-MM-DD HH:mm:ss";
-        #endregion
-
         #region fields
         /// <summary>
         /// Der Verbindungsstring zur Datenbank
@@ -49,34 +43,37 @@ namespace Heizung.ServerDotNet.Data
         #endregion
 
         #region GetAllValueDescriptions
-        /// <summary>
-        /// Ermittelt alle DatenWert-Bescheibungen aus der Datenbank
-        /// </summary>
-        /// <returns>Gibt ein Promise für die DatenBeschreibungen zurück</returns>
-        /// <exception type="exception">Wird geworfen, wenn keine Verbindung mit der Datenbank hergestellt werden kann</exception>
-        public IList<ValueDescription> GetAllValueDescriptions() 
+        /// <inheritdoc />
+        public async Task<IList<ValueDescription>> GetAllValueDescriptions(CancellationToken cancellationToken)
         {
             IList<ValueDescription> result = new List<ValueDescription>();
-            
+
             using (var connection = new MySqlConnection(this.connectionString))
             {
                 try
                 {
-                    connection.Open();
+                    await connection.OpenAsync();
 
-                    var rows = connection.Query("SELECT * FROM Heizung.ValueDescription;");
+                    var rows = await connection.QueryAsync<ValueDescription>(
+                        new CommandDefinition(
+                            "SELECT * FROM ValueDescription;",
+                            cancellationToken: cancellationToken
+                        )
+                    );
 
-                    foreach(var row in rows)
+                    foreach (var row in rows)
                     {
-                        result.Add(new ValueDescription(row.Description, row.Unit) {
-                            Id = row.Id,
-                            IsLogged = Convert.ToBoolean(row.IsLogged)
-                        });
+                        if (string.IsNullOrWhiteSpace(row.Unit))
+                        {
+                            row.Unit = null;
+                        }
+
+                        result.Add(row);
                     }
                 }
                 finally
                 {
-                    connection.Close();
+                    await connection.CloseAsync();
                 }
             }
 
@@ -85,38 +82,38 @@ namespace Heizung.ServerDotNet.Data
         #endregion
 
         #region GetDataValues
-        /// <summary>
-        /// Ermittelt alle DatenWerte innherhalb der Zeit aus der Datenbank
-        /// </summary>
-        /// <param name="fromDate">Der Zeitpunkt, von dem an die Daten ermittelt werden sollen</param>
-        /// <param name="toDate">Der Zeitpunkt, bis zu dem die Daten ermittelt werden sollen</param>
-        /// <returns>Gibt die Daten zurück</returns>
-        public IList<DataValue> GetDataValues(DateTime fromDate, DateTime toDate) 
+        /// <inheritdoc />
+        public async Task<IList<DataValue>> GetDataValues(DateTime fromDate, DateTime toDate, CancellationToken cancellationToken)
         {
             IList<DataValue> result = new List<DataValue>();
 
             using (var connection = new MySqlConnection(this.connectionString))
             {
-                connection.Open();
+                await connection.OpenAsync();
 
                 try
                 {
-                    var sql = $"SELECT * FROM Heizung.DataValues WHERE Timestamp BETWEEN @FromDate AND @ToDate";
+                    var rows = await connection.QueryAsync<DataValuesRow>(
+                        new CommandDefinition(
+                            $"SELECT * FROM DataValues WHERE Timestamp BETWEEN @FromDate AND @ToDate",
+                            new { FromDate = fromDate, ToDate = toDate },
+                            cancellationToken: cancellationToken
+                        )
+                    );
 
-                    var rows = connection.Query(sql, new { FromDate = fromDate, ToDate = toDate });
-
-                    foreach(var row in rows)
+                    foreach (var row in rows)
                     {
-                        result.Add(new DataValue(row.Value) {
+                        result.Add(new DataValue(row.Value)
+                        {
                             Id = (int)row.Id,
                             TimeStamp = row.Timestamp,
-                            ValueType = row.ValueType
+                            ValueType = Convert.ToInt32(row.ValueType)
                         });
                     }
                 }
                 finally
                 {
-                    connection.Close();
+                    await connection.CloseAsync();
                 }
             }
 
@@ -125,11 +122,8 @@ namespace Heizung.ServerDotNet.Data
         #endregion
 
         #region GetLatestDataValues
-        /// <summary>
-        /// Ermittelt die DatenWerte neusten Datenwerte (für jeden DatenTyp) aus der Datenbank
-        /// </summary>
-        /// <returns>Gibt die Daten zurück</returns>
-        public IDictionary<string, DataValue> GetLatestDataValues() 
+        /// <inheritdoc />
+        public async Task<IDictionary<string, DataValue>> GetLatestDataValues(CancellationToken cancellationToken)
         {
             IDictionary<string, DataValue> result = new Dictionary<string, DataValue>();
 
@@ -137,13 +131,17 @@ namespace Heizung.ServerDotNet.Data
             {
                 try
                 {
-                    connection.Open();
+                    await connection.OpenAsync();
 
                     var fromDate = DateTime.Now.AddHours(-2);
 
-                    var sql = $"SELECT * FROM DataValues WHERE Timestamp > @fromDate;";
-
-                    var rows = connection.Query(sql, new { fromDate = fromDate });
+                    var rows = await connection.QueryAsync<DataValuesRow>(
+                        new CommandDefinition(
+                            $"SELECT * FROM DataValues WHERE Timestamp > @fromDate;",
+                            new { fromDate = fromDate },
+                            cancellationToken: cancellationToken
+                        )
+                    );
 
                     foreach (var row in rows)
                     {
@@ -153,20 +151,25 @@ namespace Heizung.ServerDotNet.Data
                         {
                             overrideValue = true;
                         }
-                        else if (result[row.ValueType.ToString()].TimeStamp < row.TimeStamp)
+                        else if (result[row.ValueType.ToString()].TimeStamp < row.Timestamp)
                         {
                             overrideValue = true;
                         }
 
-                        if (overrideValue == true) 
+                        if (overrideValue == true)
                         {
-                            result[row.ValueType.ToString()] = row;
+                            result[row.ValueType.ToString()] = new DataValue(row.Value)
+                            {
+                                Id = Convert.ToInt32(row.Id),
+                                TimeStamp = row.Timestamp,
+                                ValueType = Convert.ToInt32(row.ValueType)
+                            };
                         }
                     }
                 }
                 finally
                 {
-                    connection.Close();
+                    await connection.CloseAsync();
                 }
             }
 
@@ -175,117 +178,109 @@ namespace Heizung.ServerDotNet.Data
         #endregion
 
         #region SetLoggingStateOfVaueType
-        /// <summary>
-        /// Stellt ein, welche Heizungswerte in der Historie gespeichert werden sollen
-        /// </summary>
-        /// <param name="loggingStates">Die Einstellung welche gesetzt werden soll</param>
-        public void SetLoggingStateOfVaueType(IList<LoggingState> loggingStates)
+        /// <inheritdoc />
+        public async Task<bool> SetLoggingStateOfVaueType(IList<LoggingState> loggingStates, CancellationToken cancellationToken)
         {
             using (var connection = new MySqlConnection(this.connectionString))
             {
                 try
                 {
-                    connection.Open();
+                    await connection.OpenAsync();
 
-                    using (var mySqlCommand = connection.CreateCommand())
+                    var parameters = new Dictionary<string, object?>();
+
+                    var sqlStringBuilder = new StringBuilder(60);
+                    sqlStringBuilder.Append("UPDATE TABLE 'ValueDescription' (Id, IsLogged) VALUE ");
+
+                    var isFirst = true;
+
+                    for (var i = 0; i < loggingStates.Count; i++)
                     {
-                        var sqlStringBuilder = new StringBuilder(60);
-                        sqlStringBuilder.Append("UPDATE TABLE 'ValueDescription' (Id, IsLogged) VALUE ");
+                        var loggingState = loggingStates[i];
 
-                        var isFirst = true;
-
-                        for (var i = 0; i < loggingStates.Count; i++)
+                        if (isFirst == true)
                         {
-                            var loggingState = loggingStates[i];
-
-                            if (isFirst == true)
-                            {
-                                isFirst = false;
-                            }
-                            else
-                            {
-                                sqlStringBuilder.Append(", ");
-                            }
-
-                            sqlStringBuilder.AppendFormat("(@id{0}, @value{0})", i);
-
-                            mySqlCommand.Parameters.AddWithValue("@id" + i, loggingState.ValueTypeId);
-                            mySqlCommand.Parameters.AddWithValue("@value" + i, loggingState.IsLoged);
+                            isFirst = false;
+                        }
+                        else
+                        {
+                            sqlStringBuilder.Append(", ");
                         }
 
-                        mySqlCommand.CommandText = sqlStringBuilder.ToString();
-                        mySqlCommand.ExecuteNonQuery();
+                        sqlStringBuilder.AppendFormat("(@id{0}, @value{0})", i);
+
+                        parameters.Add("@id" + i, loggingState.ValueTypeId);
+                        parameters.Add("@value" + i, loggingState.IsLoged);
                     }
+
+                    var rowsChanged = await connection.ExecuteAsync(
+                        new CommandDefinition(
+                            sqlStringBuilder.ToString(),
+                            cancellationToken: cancellationToken
+                        )
+                    );
+
+                    return rowsChanged > 0;
                 }
                 finally
                 {
-                    connection.Close();
+                    await connection.CloseAsync();
                 }
             }
         }
         #endregion
 
         #region GetMailNotifierConfig
-        /// <summary>
-        /// Ermittelt die NotifierConfig aus der Datenbank
-        /// </summary>
-        /// <returns>Git die NotifierConfig zurück</returns>
-        public NotifierConfig GetMailNotifierConfig()
+        /// <inheritdoc />
+        public async Task<NotifierConfig> GetMailNotifierConfig(CancellationToken cancellationToken)
         {
             var result = new NotifierConfig()
             {
                 MailConfigs = new List<MailConfig>()
             };
 
-            var from = DateTime.Now.AddHours(-2);
-            IList<string> valuesStrings = new List<string>();
-
-            using (var connectionA = new MySqlConnection(this.connectionString))
-            {            
-                using (var connectionB = new MySqlConnection(this.connectionString))
+            using (var connection = new MySqlConnection(this.connectionString))
+            {
+                try
                 {
-                    try
+                    await connection.OpenAsync();
+
+                    var transaction = await connection.BeginTransactionAsync();
+
+                    var lowerThreshold = await connection.ExecuteScalarAsync<double?>(
+                        new CommandDefinition(
+                            "SELECT LowerThreshold FROM NotifierConfig",
+                            transaction: transaction,
+                            cancellationToken: cancellationToken
+                        )
+                    );
+
+                    if (lowerThreshold.HasValue == false)
                     {
-                        connectionA.Open();
-                        connectionB.Open();
-
-                        var lowerThresholdQueryTask = connectionA.QueryAsync("SELECT LowerThreshold FROM NotifierConfig;");
-                        var notifierMailsQueryTask = connectionB.QueryAsync("SELECT Mail FROM NotifierMails;");
-
-                        Task.WaitAll(lowerThresholdQueryTask, notifierMailsQueryTask);
-
-                        IList<Exception> exceptions = new List<Exception>();
-
-                        if (lowerThresholdQueryTask.IsFaulted)
-                        {
-                            exceptions.Add(lowerThresholdQueryTask.Exception ?? new Exception());
-                        }
-
-                        if (notifierMailsQueryTask.IsFaulted)
-                        {
-                            exceptions.Add(notifierMailsQueryTask.Exception ?? new Exception());
-                        }
-
-                        if (exceptions.Count > 0)
-                        {
-                            throw new AggregateException("Beim ermitteln von der MailConfig ist mindestens ein Fehler aufgetreten", exceptions);
-                        }
-
-                        if (lowerThresholdQueryTask.Result.Count() > 0)
-                        {
-                            result.LowerThreshold = lowerThresholdQueryTask.Result.ElementAt(0).LowerThreshold;
-
-                            foreach(var row in notifierMailsQueryTask.Result)
-                            {
-                                result.MailConfigs.Add(new MailConfig(row.Mail));
-                            }
-                        }
+                        throw new Exception("LowerThreshold was not found in table \"NotifierConfig\"");
                     }
-                    finally
+
+                    var notifierMails = await connection.QueryAsync<string>(
+                        new CommandDefinition(
+                            "SELECT Mail FROM NotifierMails",
+                            transaction: transaction,
+                            cancellationToken: cancellationToken
+                        )
+                    );
+
+                    if (notifierMails.Count()  == 0)
                     {
-                        connectionA.Close();
-                        connectionB.Close();
+                        throw new Exception("No Mail was not found in table \"NotifierMails\"");
                     }
+
+                    foreach (var mail in notifierMails)
+                    {
+                        result.MailConfigs.Add(new MailConfig(mail));
+                    }
+                }
+                finally
+                {
+                    await connection.CloseAsync();
                 }
             }
 
@@ -294,12 +289,8 @@ namespace Heizung.ServerDotNet.Data
         #endregion
 
         #region SetMailNotifierConfig
-        /// <summary>
-        /// Ermittelt die NotifierConfig aus der Datenbank
-        /// </summary>
-        /// <param name="notifierConfig">Die Konfiguration, welche gespeichert werden soll</param>
-        /// <exception type="Exception">Wird geworfen, wenn ein Datenbankfehler auftritt</exception>
-        public void SetMailNotifierConfig(NotifierConfig notifierConfig)
+        /// <inheritdoc />
+        public async Task<bool> SetMailNotifierConfig(NotifierConfig notifierConfig, CancellationToken cancellationToken)
         {
             List<string> valuesList = new List<string>();
             for (var i = 0; i < notifierConfig.MailConfigs.Count; i++)
@@ -307,72 +298,88 @@ namespace Heizung.ServerDotNet.Data
                 valuesList.Add($"({i}, '{notifierConfig.MailConfigs[i].Mail}')");
             }
 
-            using (MySqlConnection connectionA = new MySqlConnection(this.connectionString))
+            using (MySqlConnection connection = new MySqlConnection(this.connectionString))
             {
-                using (MySqlConnection connectionB = new MySqlConnection(this.connectionString))
+                try
                 {
-                    try
+                    await connection.OpenAsync();
+
+                    var transaction = await connection.BeginTransactionAsync();
+
+                    var rowsChanged = await connection.ExecuteAsync(
+                        new CommandDefinition(
+                            $"UPDATE NotifierConfig SET LowerThreshold = @lowerThreshhold",
+                            new { lowerThreshhold = notifierConfig.LowerThreshold },
+                            transaction: transaction,
+                            cancellationToken: cancellationToken
+                        )
+                    );
+
+                    if (rowsChanged == 0)
                     {
-                        connectionA.Open();
-                        connectionB.Open();
+                        return false;
+                    }
 
-                        var updateNotifierConfigQueryTask = connectionA.ExecuteAsync($"UPDATE NotifierConfig SET LowerThreshold = @lowerThreshhold", new { lowerThreshhold = notifierConfig.LowerThreshold });
-                        
-                        connectionB.Execute("TRUNCATE TABLE NotifierMails");
+                    await connection.ExecuteAsync(
+                        new CommandDefinition(
+                            "TRUNCATE TABLE NotifierMails",
+                            transaction: transaction,
+                            cancellationToken: cancellationToken
+                        )
+                    );
 
-                        using (var insertCommand = connectionB.CreateCommand())
+                    var parameters = new Dictionary<string, object?>();
+
+                    var stringBuilder = new StringBuilder(60);
+                    stringBuilder.Append("INSERT INTO NotifierMails (Id, Mail) VALUES ");
+
+                    var isFirst = true;
+
+                    for (var i = 0; i < notifierConfig.MailConfigs.Count; i++)
+                    {
+                        var mailConfig = notifierConfig.MailConfigs[i];
+
+                        if (isFirst == true)
                         {
-                            var stringBuilder = new StringBuilder(60);
-                            stringBuilder.Append("INSERT INTO NotifierMails (Id, Mail) VALUES ");
-                            
-                            var isFirst = true;
-
-                            for (var i = 0; i < notifierConfig.MailConfigs.Count; i++)
-                            {
-                                var mailConfig = notifierConfig.MailConfigs[i];
-
-                                if (isFirst == true)
-                                {
-                                    isFirst = false;
-                                }
-                                else
-                                {
-                                    stringBuilder.Append(", ");
-                                }
-
-                                stringBuilder.AppendFormat("(@id{0}, @mail{0})", i);
-                                insertCommand.Parameters.AddWithValue("@id" + i, i);
-                                insertCommand.Parameters.AddWithValue("@mail" + i, mailConfig.Mail);
-                            }
-
-                            insertCommand.CommandText = stringBuilder.ToString();
-                            insertCommand.ExecuteNonQuery();
+                            isFirst = false;
+                        }
+                        else
+                        {
+                            stringBuilder.Append(", ");
                         }
 
-                        updateNotifierConfigQueryTask.Wait();
+                        stringBuilder.AppendFormat("(@id{0}, @mail{0})", i);
+                        parameters.Add("@id" + i, i);
+                        parameters.Add("@mail" + i, mailConfig.Mail);
+                    }
 
-                        if (updateNotifierConfigQueryTask.IsFaulted)
-                        {
-                            throw updateNotifierConfigQueryTask.Exception ?? new Exception();
-                        }
-                    }
-                    finally
+                    await connection.ExecuteAsync(
+                        new CommandDefinition(
+                            stringBuilder.ToString(),
+                            parameters,
+                            transaction: transaction,
+                            cancellationToken: cancellationToken
+                        )
+                    );
+
+                    if (cancellationToken.IsCancellationRequested == false)
                     {
-                        connectionA.Close();
-                        connectionB.Close();
+                        await transaction.CommitAsync();
                     }
+
+                    return true;
+                }
+                finally
+                {
+                    await connection.CloseAsync();
                 }
             }
         }
         #endregion
 
         #region GetAllErrorDictionary
-        /// <summary>
-        /// Ermittelt eine Dictionary mit allen Fehlern
-        /// </summary>
-        /// <exception type="Exception">Wird geworfen, wenn ein Datenbankfehler auftritt</exception>
-        /// <returns>Gibt die Fehler als Dictionary zurück</returns>
-        public IDictionary<int, ErrorDescription> GetAllErrorDictionary()
+        /// <inheritdoc />
+        public async Task<IDictionary<int, ErrorDescription>> GetAllErrorDictionary(CancellationToken cancellationToken)
         {
             IDictionary<int, ErrorDescription> result = new Dictionary<int, ErrorDescription>();
 
@@ -380,24 +387,26 @@ namespace Heizung.ServerDotNet.Data
             {
                 try
                 {
-                    connection.Open();
+                    await connection.OpenAsync();
 
-                    var rows = connection.Query("SELECT * FROM Heizung.ErrorList");
+                    var rows = await connection.QueryAsync<ErrorDescription>(
+                        new CommandDefinition(
+                            "SELECT * FROM Heizung.ErrorList",
+                            cancellationToken: cancellationToken
+                        )
+                    );
 
                     foreach (var row in rows)
                     {
-                        if (result.ContainsKey((int)row.Id) == false)
+                        if (result.ContainsKey(row.Id) == false)
                         {
-                            result.Add((int)row.Id, new ErrorDescription(row.Description)
-                            {
-                                Id = (int)row.Id
-                            });
+                            result.Add(row.Id, row);
                         }
                     }
                 }
                 finally
                 {
-                    connection.Close();
+                    await connection.CloseAsync();
                 }
             }
 
@@ -406,13 +415,8 @@ namespace Heizung.ServerDotNet.Data
         #endregion
 
         #region GetOperatingHoures
-        /// <summary>
-        /// Ermittelt eine Liste von täglichen Betriebsstunden im angegeben Zeitraum
-        /// </summary>
-        /// <param name="from">Von welchem Datum an geholt werden soll. (Nur Datum wird beachtet nicht Uhrzeit)</param>
-        /// <param name="to">Bis zu welchem Zeitpunkt geholt werden soll. (Nur Datum wird beachtet nicht Uhrzeit)</param>
-        /// <returns>Gibt die Liste der ermittelten Einträge zurück</returns>
-        public IList<DayOperatingHoures> GetOperatingHoures(DateTime from, DateTime to)
+        /// <inheritdoc />
+        public async Task<IList<DayOperatingHoures>> GetOperatingHoures(DateTime from, DateTime to, CancellationToken cancellationToken)
         {
             const string sql = "SELECT * FROM OperatingHoures WHERE `Timestamp` BETWEEN @FromDate AND @ToDate";
             IList<DayOperatingHoures> result = new List<DayOperatingHoures>();
@@ -424,9 +428,11 @@ namespace Heizung.ServerDotNet.Data
             {
                 try
                 {
-                    connection.Open();
+                    await connection.OpenAsync();
 
-                    var rows = connection.Query(sql, new { FromDate= from, ToDate=to });
+                    var command = new CommandDefinition(sql, new { FromDate = from, ToDate = to }, cancellationToken: cancellationToken);
+
+                    var rows = await connection.QueryAsync<OperatingHouresRow>(command);
 
                     foreach (var row in rows)
                     {
@@ -441,7 +447,7 @@ namespace Heizung.ServerDotNet.Data
                 }
                 finally
                 {
-                    connection.Close();
+                    await connection.CloseAsync();
                 }
             }
 
@@ -450,13 +456,8 @@ namespace Heizung.ServerDotNet.Data
         #endregion
 
         #region SetNewError
-        /// <summary>
-        /// Erzeugt einen neuen Eintrag in der FehlerTabelle
-        /// </summary>
-        /// <param name="errorText">Der Fehlertext von der neuen Fehlermeldung</param>
-        /// <exception type="Exception">Wird geworfen, wenn ein Datenbankfehler auftritt</exception>
-        /// <returns>Gibt die Id von dem neuen Eintrag zurück</returns>
-        public int SetNewError(string errorText)
+        /// <inheritdoc />
+        public async Task<int> SetNewError(string errorText, CancellationToken cancellationToken)
         {
             var result = 0;
 
@@ -464,18 +465,35 @@ namespace Heizung.ServerDotNet.Data
             {
                 try
                 {
-                    connection.Open();
+                    await connection.OpenAsync();
 
-                    var transaction = connection.BeginTransaction();
+                    var transaction = await connection.BeginTransactionAsync();
 
-                    connection.Execute($"INSERT INTO ErrorList (Description) VALUE (@errorText)", param: new { errorText = errorText}, transaction: transaction);
-                    result = connection.QuerySingle<int>("Select LAST_INSERT_ID()", transaction: transaction);
+                    var insertCommand = new CommandDefinition(
+                        $"INSERT INTO ErrorList (Description) VALUE (@errorText)",
+                        parameters: new { errorText = errorText },
+                        transaction: transaction,
+                        cancellationToken: cancellationToken
+                    );
 
-                    transaction.Commit();
+                    await connection.ExecuteAsync(insertCommand);
+
+                    result = await connection.QuerySingleAsync<int>(
+                        new CommandDefinition(
+                            "Select LAST_INSERT_ID()",
+                            transaction: transaction,
+                            cancellationToken: cancellationToken
+                        )
+                    );
+
+                    if (cancellationToken.IsCancellationRequested == false)
+                    {
+                        await transaction.CommitAsync();
+                    }
                 }
                 finally
                 {
-                    connection.Close();
+                    await connection.CloseAsync();
                 }
             }
 
@@ -484,63 +502,112 @@ namespace Heizung.ServerDotNet.Data
         #endregion
 
         #region SetHeaterValue
-        /// <inheritdoc cref="IHeaterRepository.SetHeaterValue(IEnumerable{HeaterData})" />
-        public void SetHeaterValue(IEnumerable<HeaterData> heaterDataList)
+        /// <inheritdoc />
+        public async Task<bool> SetHeaterValue(IEnumerable<HeaterData> heaterDataList, CancellationToken cancellationToken)
         {
             using (var connection = new MySqlConnection(this.connectionString))
             {
                 try
                 {
-                    connection.Open();
+                    await connection.OpenAsync();
 
-                    using (var insertCommand = connection.CreateCommand())
+                    var parameters = new Dictionary<string, object?>();
+
+                    var sqlStringBuilder = new StringBuilder(80);
+                    sqlStringBuilder.Append("INSERT INTO Heizung.DataValues (ValueType, Value, Timestamp) VALUES ");
+
+                    var isFirst = true;
+
+                    var counter = 0;
+                    foreach (var element in heaterDataList)
                     {
-                        var sqlStringBuilder = new StringBuilder(80);
-                        sqlStringBuilder.Append("INSERT INTO Heizung.DataValues (ValueType, Value, Timestamp) VALUES ");
-
-                        var isFirst = true;
-
-                        var counter = 0;
-                        foreach (var element in heaterDataList)
+                        for (var j = 0; j < element.Data.Count; j++)
                         {
-                            for (var j = 0; j < element.Data.Count; j++)
+                            if (element.Data[j].TimeStamp > new DateTime(2000, 1, 1))
                             {
-                                if (element.Data[j].TimeStamp > new DateTime(2000, 1, 1))
+                                if (isFirst == true)
                                 {
-                                    if (isFirst == true)
-                                    {
-                                        isFirst = false;
-                                    }
-                                    else
-                                    {
-                                        sqlStringBuilder.Append(", ");
-                                    }
-
-                                    sqlStringBuilder.AppendFormat("(@valueType{0}, @value{0}, @timestamp{0})", counter);
-                                    insertCommand.Parameters.AddWithValue($"@valueType{counter}", element.ValueTypeId);
-                                    insertCommand.Parameters.AddWithValue($"@value{counter}", element.Data[j].Value);
-                                    insertCommand.Parameters.AddWithValue($"@timestamp{counter}", element.Data[j].TimeStamp);
+                                    isFirst = false;
+                                }
+                                else
+                                {
+                                    sqlStringBuilder.Append(", ");
                                 }
 
-                                counter++;
+                                sqlStringBuilder.AppendFormat("(@valueType{0}, @value{0}, @timestamp{0})", counter);
+                                parameters.Add($"@valueType{counter}", element.ValueTypeId);
+                                parameters.Add($"@value{counter}", element.Data[j].Value);
+                                parameters.Add($"@timestamp{counter}", element.Data[j].TimeStamp);
                             }
-                        }
 
-                        insertCommand.CommandText = sqlStringBuilder.ToString();
-                        this.logger.LogTrace("String: \"{0}\"", insertCommand.CommandText);
-
-                        if (insertCommand.CommandText.Length > 0)
-                        {
-                            insertCommand.ExecuteNonQuery();
+                            counter++;
                         }
                     }
+
+                    var command = new CommandDefinition(sqlStringBuilder.ToString(), parameters, cancellationToken: cancellationToken);
+
+                    var insertedRowsCount = await connection.ExecuteAsync(command);
+
+                    return insertedRowsCount > 0;
                 }
                 finally
                 {
-                    connection.Close();
+                    await connection.CloseAsync();
                 }
             }
         }
         #endregion
+
+        /// <summary>
+        /// Stellt eine Zeile aus der Tabelle DataValues dar
+        /// </summary>
+        private struct DataValuesRow
+        {
+            /// <summary>
+            /// Die Id vom Wert
+            /// </summary>
+            public uint Id { get; set; }
+
+            /// <summary>
+            /// Der Typ vom Heizungswert
+            /// </summary>
+            public uint ValueType { get; set; }
+
+            /// <summary>
+            /// Der Heizungswert
+            /// </summary>
+            public float Value { get; set; }
+
+            /// <summary>
+            /// Der Zeitpunkt vom Wert
+            /// </summary>
+            public DateTime Timestamp { get; set; }
+        }
+
+        /// <summary>
+        /// Stellt eine Zeile aus der Tabelle OperatingHours dar.
+        /// </summary>
+        private struct OperatingHouresRow
+        {
+            /// <summary>
+            /// Der Zeitstempel vom Datenpunkt.
+            /// </summary>
+            public DateTime Timestamp { get; set; }
+
+            /// <summary>
+            /// Der Maximalwert vom Tag
+            /// </summary>
+            public float MaxDay { get; set; }
+
+            /// <summary>
+            /// Der Minimalwert vom Tag
+            /// </summary>
+            public float MinDay { get; set; }
+
+            /// <summary>
+            /// Die Anzahl der Stunde die an diesem Tag geheizt wurden
+            /// </summary>
+            public double Amount { get; set; }
+        }
     }
 }

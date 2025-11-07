@@ -46,7 +46,7 @@ namespace Heizung.ServerDotNet.Controllers
         [HttpGet]
         public ActionResult<NotifierConfig> Configuration()
         {
-            return base.Ok(this.heaterRepository.GetMailNotifierConfig());
+            return base.Ok(this.heaterRepository.GetMailNotifierConfig(base.HttpContext.RequestAborted));
         }
         #endregion
 
@@ -58,7 +58,7 @@ namespace Heizung.ServerDotNet.Controllers
         [HttpPut]
         public ActionResult Configuration([FromBody]NotifierConfig notifierConfig)
         {
-            this.heaterRepository.SetMailNotifierConfig(notifierConfig);
+            this.heaterRepository.SetMailNotifierConfig(notifierConfig, base.HttpContext.RequestAborted);
 
             return base.NoContent();
         }
