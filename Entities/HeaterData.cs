@@ -11,6 +11,16 @@ namespace Heizung.ServerDotNet.Entities
         /// <summary>
         /// Initialisiert die Klasse
         /// </summary>
+        public HeaterData()
+        {
+            this.Description = "";
+            this.Unit = null;
+            this.Data = new List<HeaterDataPoint>();
+        }
+
+        /// <summary>
+        /// Initialisiert die Klasse
+        /// </summary>
         /// <param name="description">Die Beschreibung der Heizungsdaten</param>
         /// <param name="unit"></param>
         public HeaterData(string description, string? unit)

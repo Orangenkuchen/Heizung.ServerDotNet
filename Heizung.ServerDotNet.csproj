@@ -5,8 +5,8 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
-    <PublishAot>true</PublishAot>
-    <RuntimeIdentifier>linux-arm64</RuntimeIdentifier>
+    <!--<PublishAot>true</PublishAot>
+    <RuntimeIdentifier>linux-arm64</RuntimeIdentifier>-->
   </PropertyGroup>
 
   <ItemGroup>

@@ -9,6 +9,15 @@ namespace Heizung.ServerDotNet.Entities
         /// <summary>
         /// Initialisiert die Klasse
         /// </summary>
+        public ValueDescription()
+        {
+            this.Description = "";
+            this.Unit = null;
+        }
+
+        /// <summary>
+        /// Initialisiert die Klasse
+        /// </summary>
         /// <param name="description">Die Berschreibung vom Wert</param>
         /// <param name="unit">Die Einheit vom Wert</param>
         public ValueDescription(string description, string unit)
